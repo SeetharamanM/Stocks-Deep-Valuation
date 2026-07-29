@@ -315,3 +315,43 @@ def build_pack(fin, md, sector, rf, erp, dcf_overrides=None):
         )
 
     return pack
+
+
+def scenario_values(fin, pack, scenario_specs):
+    """Run the DCF once per scenario so Python owns the scenario fair values.
+
+    Each spec supplies driver overrides (and optionally its own terminal
+    growth); the model states what changes, Python computes what that is worth.
+    """
+    from src.metrics_dcf import dcf_from_drivers
+
+    dcf = pack.get("dcf") or {}
+    assumptions = dcf.get("assumptions") or {}
+    base_drivers = assumptions.get("drivers") or []
+    out = []
+    for spec in scenario_specs or []:
+        overrides = spec.get("driver_overrides") or {}
+        drivers = []
+        for year_driver in base_drivers:
+            merged = dict(year_driver)
+            merged.update({k: v for k, v in overrides.items() if v is not None})
+            drivers.append(merged)
+        tg = spec.get("terminal_growth", dcf.get("terminal_growth"))
+        value, note = None, ""
+        if drivers and dcf.get("viable"):
+            try:
+                value = dcf_from_drivers(
+                    dcf.get("base_revenue"), drivers, dcf.get("wacc"), tg,
+                    dcf.get("net_debt"), dcf.get("shares"),
+                    terminal_capex_pct=assumptions.get("terminal_capex_pct"),
+                )["fair_value_per_share"]
+            except (ValueError, ZeroDivisionError) as exc:
+                note = f"not computable: {exc}"
+        else:
+            note = "no viable DCF to re-run for this scenario"
+        out.append({"name": spec.get("name"), "value": value,
+                    "prob": spec.get("prob"),
+                    "assumptions": spec.get("assumptions", ""),
+                    "driver_overrides": overrides,
+                    "note": note})
+    return out

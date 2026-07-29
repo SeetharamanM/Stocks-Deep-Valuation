@@ -367,12 +367,14 @@ def _s7_triangulation(result):
     rows = "".join(
         f'<tr><td>{html.escape(str(m.get("name")))}</td><td>{rs(m.get("value"))}</td>'
         f'<td>{pct((m.get("weight") or 0) / tw)}</td>'
-        f'<td>{rs((m.get("value") or 0) * (m.get("weight") or 0) / tw)}</td></tr>'
+        f'<td>{rs((m.get("value") or 0) * (m.get("weight") or 0) / tw)}</td>'
+        f'<td style="text-align:left">{html.escape(str(m.get("rationale") or m.get("basis") or ""))}</td></tr>'
         for m in methods)
     foot = (f'<tr><td>Blended fair value</td><td colspan="2"></td>'
-            f'<td><u>{rs(tri.get("blended"))}</u></td></tr>')
-    out = _table("Fair value triangulation",
-                 "<tr><th>Method</th><th>Fair value</th><th>Weight</th><th>Contribution</th></tr>",
+            f'<td><u>{rs(tri.get("blended"))}</u></td><td></td></tr>')
+    out = _table("Fair value triangulation — values computed here, weights chosen by the analysis pass",
+                 "<tr><th>Method</th><th>Fair value</th><th>Weight</th><th>Contribution</th>"
+                 "<th>Rationale for weight</th></tr>",
                  rows, foot)
     out += '<div class="chartbox"><canvas id="triChart" height="120"></canvas></div>'
     lo, hi = tri.get("low"), tri.get("high")
@@ -396,14 +398,17 @@ def _s8_scenarios(result, pack):
     if not rows_data:
         return _callout("No scenarios supplied", "The analysis pass returned no scenario set.")
     rows = "".join(
-        f'<tr><td>{html.escape(str(s.get("name")))}</td><td>{rs(s.get("value"))}</td>'
+        f'<tr><td>{html.escape(str(s.get("name")))}</td>'
+        f'<td style="text-align:left">{html.escape(str(s.get("assumptions") or ""))}</td>'
+        f'<td>{rs(s.get("value"))}</td>'
         f'<td>{pct(s.get("move_pct"))}</td><td>{pct(s.get("prob"), 0)}</td></tr>'
         for s in rows_data)
     ev = sc.get("expected_value")
-    foot = (f'<tr><td>Probability-weighted expected value</td><td><u>{rs(ev)}</u></td>'
+    foot = (f'<tr><td>Probability-weighted expected value</td><td></td><td><u>{rs(ev)}</u></td>'
             f'<td>{pct(sc.get("upside_pct"))}</td><td>100%</td></tr>')
-    out = _table("Scenario analysis",
-                 "<tr><th>Scenario</th><th>Fair value</th><th>Move vs price</th><th>Probability</th></tr>",
+    out = _table("Scenario analysis — each scenario re-run through the same DCF engine",
+                 "<tr><th>Scenario</th><th>Key assumptions</th><th>Fair value</th>"
+                 "<th>Move vs price</th><th>Probability</th></tr>",
                  rows, foot)
     out += '<div class="chartbox"><canvas id="scenChart" height="120"></canvas></div>'
     if sc.get("prob_sum_ok") is False:

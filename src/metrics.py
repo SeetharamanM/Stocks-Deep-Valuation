@@ -236,3 +236,58 @@ def justified_pb(roe, g, coe):
     if abs(denom) < 1e-9:
         return None
     return (roe - g) / denom
+
+
+def computable_methods(pack):
+    """Fair value per share for each method Python can evaluate itself.
+
+    The model chooses which methods to weight; it must never supply the values,
+    or the report's figures would originate from a language model rather than
+    from the statements. Methods that cannot be computed return None and are
+    dropped by `triangulate` with the omission disclosed.
+    """
+    base, bands, ret = pack["base"], pack["bands"], pack["returns"]
+    dcf = pack.get("dcf") or {}
+    eps = base.get("eps_latest_fy")
+    bvps = base.get("bvps")
+    coe = dcf.get("coe")
+    g = dcf.get("terminal_growth")
+
+    def _mult(multiple, per_share):
+        if multiple is None or per_share is None:
+            return None
+        return multiple * per_share
+
+    jpb = justified_pb(ret.get("roe"), g, coe) if None not in (ret.get("roe"), g, coe) else None
+
+    methods = [
+        {"name": "DCF",
+         "value": dcf.get("fair_value_per_share") if dcf.get("viable") else None,
+         "basis": "Driver-based 5-year explicit forecast plus terminal value"},
+        {"name": "P/E - 5-yr median",
+         "value": _mult(bands.get("median_pe_5y"), eps),
+         "basis": f"5-yr median P/E x latest-FY EPS of {eps:,.2f}" if eps else "unavailable"},
+        {"name": "P/E - 10-yr median",
+         "value": _mult(bands.get("median_pe_10y"), eps),
+         "basis": f"10-yr median P/E x latest-FY EPS of {eps:,.2f}" if eps else "unavailable"},
+        {"name": "Justified P/B",
+         "value": _mult(jpb, bvps),
+         "basis": "(ROE - g) / (COE - g) x book value per share"},
+    ]
+    return methods
+
+
+def apply_weights(methods, weights):
+    """Attach model-chosen weights to Python-computed method values."""
+    by_name = {m["name"]: m for m in methods}
+    out = []
+    for entry in weights or []:
+        name = entry.get("name")
+        method = by_name.get(name)
+        if method is None:
+            continue
+        out.append({"name": name, "value": method["value"],
+                    "weight": entry.get("weight", 0.0),
+                    "basis": method["basis"],
+                    "rationale": entry.get("rationale", "")})
+    return out

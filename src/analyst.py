@@ -14,8 +14,9 @@ assumptions imply.
 
 import json
 
-from src.valuation_pack import build_pack
-from src.metrics import triangulate, scenario_expected_value
+from src.valuation_pack import build_pack, scenario_values
+from src.metrics import (triangulate, scenario_expected_value,
+                         computable_methods, apply_weights)
 from src.prompts import ASSUMPTIONS_SYSTEM, narrative_system, NARRATIVE_BATCHES
 
 # Keep prompts within a sane token budget; the pack is the important part.
@@ -45,9 +46,16 @@ def run_analysis(fin, md, sector, pdf_context, client, rf, erp):
         "drivers": assumptions.get("drivers"),
         "terminal_growth": assumptions.get("terminal_growth", 0.05),
     })
-    triangulation = triangulate(assumptions.get("triangulation") or [])
+    # Values are computed here, not taken from the model: the model chose the
+    # methods and their weights, Python evaluates what each is worth.
+    methods = computable_methods(pack)
+    triangulation = triangulate(
+        apply_weights(methods, assumptions.get("triangulation_weights")))
     price = pack["meta"]["current_price"]
-    scenario = scenario_expected_value(assumptions.get("scenarios") or [], price)
+    # Each scenario is re-run through the same DCF engine with its own driver
+    # overrides, so the bear/base/bull values are consistent by construction.
+    scenario = scenario_expected_value(
+        scenario_values(fin, pack, assumptions.get("scenarios")), price)
 
     # Pass 2 -- prose written against the recomputed figures.
     final_numbers = {

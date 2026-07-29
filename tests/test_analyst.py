@@ -41,11 +41,18 @@ class FakeClient:
         self.seen_system.append(system)
         if self.calls == 1:
             return {"drivers": DRIVERS, "terminal_growth": 0.05,
-                    "scenarios": [{"name": "Bear", "value": 400, "prob": 0.30},
-                                  {"name": "Base", "value": 600, "prob": 0.50},
-                                  {"name": "Bull", "value": 900, "prob": 0.20}],
-                    "triangulation": [{"name": "DCF", "value": 520, "weight": 0.5},
-                                      {"name": "Relative", "value": 700, "weight": 0.5}],
+                    "scenarios": [
+                        {"name": "Bear", "prob": 0.30, "assumptions": "growth stalls",
+                         "driver_overrides": {"revenue_growth": 0.04,
+                                              "ebit_margin": 0.14}},
+                        {"name": "Base", "prob": 0.50, "assumptions": "as modelled",
+                         "driver_overrides": {}},
+                        {"name": "Bull", "prob": 0.20, "assumptions": "order book converts",
+                         "driver_overrides": {"revenue_growth": 0.18}}],
+                    "triangulation_weights": [
+                        {"name": "DCF", "weight": 0.5, "rationale": "fits the capex cycle"},
+                        {"name": "P/E - 5-yr median", "weight": 0.3, "rationale": "re-rated"},
+                        {"name": "Justified P/B", "weight": 0.2, "rationale": "ROE cross-check"}],
                     "model_choice": "DCF",
                     "rationale": {"drivers": "capex normalises as build-out completes"}}
         wanted = self._requested(system)
@@ -119,3 +126,39 @@ def test_narrative_pass_receives_final_numbers():
     second_prompt = client.seen_user[1]
     assert "FINAL NUMBERS" in second_prompt
     assert "triangulation" in second_prompt.lower()
+
+
+def test_method_values_come_from_python_not_the_model():
+    """The model weights methods; Python computes what each is worth."""
+    from src.metrics import computable_methods
+    fin, md = _fin_md()
+    result = run_analysis(fin, md, "non-financial", "", FakeClient(), 0.069, 0.055)
+
+    expected = {m["name"]: m["value"] for m in computable_methods(result["pack"])}
+    for method in result["triangulation"]["methods"]:
+        assert method["value"] == expected[method["name"]], \
+            f"{method['name']} value diverged from the Python-computed figure"
+    assert result["triangulation"]["blended"] > 0
+
+
+def test_scenario_values_are_recomputed_through_the_dcf():
+    """Bear/base/bull must be DCF outputs, not numbers the model asserted."""
+    fin, md = _fin_md()
+    result = run_analysis(fin, md, "non-financial", "", FakeClient(), 0.069, 0.055)
+    scen = {s["name"]: s["value"] for s in result["scenario"]["scenarios"]}
+
+    assert None not in scen.values()
+    # base case reuses the unmodified drivers, so it must equal the DCF itself
+    assert abs(scen["Base"] - result["pack"]["dcf"]["fair_value_per_share"]) < 0.01
+    # a lower growth/margin scenario must be worth less than the base case
+    assert scen["Bear"] < scen["Base"] < scen["Bull"]
+
+
+def test_no_placeholder_zeros_reach_the_report():
+    """The old bug: the model echoed the example shape's 0 values."""
+    fin, md = _fin_md()
+    result = run_analysis(fin, md, "non-financial", "", FakeClient(), 0.069, 0.055)
+    for method in result["triangulation"]["methods"]:
+        assert method["value"] != 0
+    for s in result["scenario"]["scenarios"]:
+        assert s["value"] != 0

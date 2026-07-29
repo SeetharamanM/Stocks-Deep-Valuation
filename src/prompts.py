@@ -27,6 +27,10 @@ Return a single JSON object and nothing else. No preamble, no commentary, no
 markdown code fences, and no quoted extracts from the source documents. The
 first character of your reply must be '{' and the last must be '}'.
 
+You state ASSUMPTIONS ONLY. You never state a fair value, a target price, or
+any other computed amount -- those are calculated from your assumptions after
+this pass. Any number you write must be a rate, a ratio or a probability.
+
 The JSON must match this shape exactly:
 
 {
@@ -36,16 +40,32 @@ The JSON must match this shape exactly:
   ],
   "terminal_growth": 0.05,
   "scenarios": [          // exactly 3; probabilities must sum to 1.0
-    {"name": "Bear", "value": 0, "prob": 0.25},
-    {"name": "Base", "value": 0, "prob": 0.55},
-    {"name": "Bull", "value": 0, "prob": 0.20}
+    {"name": "Bear", "prob": 0.25,
+     "assumptions": "what has to go wrong, in one or two sentences",
+     "driver_overrides": {"revenue_growth": 0.05, "ebit_margin": 0.14,
+                          "capex_pct_sales": 0.12}},
+    {"name": "Base", "prob": 0.55, "assumptions": "...", "driver_overrides": {}},
+    {"name": "Bull", "prob": 0.20, "assumptions": "...",
+     "driver_overrides": {"revenue_growth": 0.18, "ebit_margin": 0.19}}
   ],
-  "triangulation": [      // per-method fair values and weights
-    {"name": "DCF", "value": 0, "weight": 0.5}
+  "triangulation_weights": [   // weights only -- values are computed for you
+    {"name": "DCF", "weight": 0.5, "rationale": "one line"},
+    {"name": "P/E - 5-yr median", "weight": 0.2, "rationale": "one line"},
+    {"name": "P/E - 10-yr median", "weight": 0.1, "rationale": "one line"},
+    {"name": "Justified P/B", "weight": 0.2, "rationale": "one line"}
   ],
   "model_choice": "DCF",
   "rationale": {"drivers": "...", "scenarios": "...", "triangulation": "..."}
 }
+
+Rules for these fields:
+- "driver_overrides" replaces the named driver in EVERY forecast year of that
+  scenario. Omit a key to leave it at the base-case path. An empty object means
+  the scenario uses the base case unchanged.
+- "triangulation_weights" may only name methods from this list, and weights
+  should sum to 1.0: "DCF", "P/E - 5-yr median", "P/E - 10-yr median",
+  "Justified P/B". Weight each by how well it fits THIS business. A method
+  that cannot be computed is dropped and the weights renormalised.
 
 Binding constraints:
 - Terminal growth must not exceed long-run nominal Indian GDP (~5-6%).
