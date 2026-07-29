@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ company }} — Valuation &amp; Recommendation Report</title>
+<style>
+:root{
+  --paper:#f7f4ee;      --paper-2:#fffdf9;   --ink:#16191d;
+  --ink-soft:#4a5058;   --rule:#d8d2c6;      --rule-strong:#a89f8d;
+  --navy:#12283f;       --buy:#1c6b45;       --hold:#a9741a;   --sell:#9b2c22;
+  --accent:#7a1f1a;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:"Palatino Linotype","Book Antiqua",Palatino,Cambria,Charter,Georgia,serif;
+  font-size:16px; line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+.num,table,.metric{font-variant-numeric:tabular-nums; font-feature-settings:"tnum" 1;}
+.wrap{max-width:1080px; margin:0 auto; padding:0 32px;}
+
+/* ---------- masthead ---------- */
+header.masthead{
+  background:var(--navy); color:#f3efe6; padding:34px 0 26px;
+  border-bottom:3px double var(--rule-strong);
+}
+.eyebrow{
+  font-size:11px; letter-spacing:.28em; text-transform:uppercase;
+  color:#9db3c9; margin:0 0 10px;
+}
+header.masthead h1{
+  margin:0; font-size:34px; font-weight:600; letter-spacing:-.01em; line-height:1.15;
+}
+.subject{ font-style:italic; color:#c6d4e2; margin:6px 0 20px; font-size:16px; }
+.quotebar{
+  display:flex; flex-wrap:wrap; gap:26px; padding-top:16px;
+  border-top:1px solid rgba(255,255,255,.18);
+}
+.quotebar div{font-size:13px; color:#9db3c9;}
+.quotebar b{display:block; font-size:21px; color:#fffdf9; font-weight:600; margin-top:3px;}
+
+/* ---------- verdict ---------- */
+.verdict{
+  background:var(--paper-2); border:1px solid var(--rule);
+  border-left:10px solid var(--sig); margin:26px 0 8px;
+  padding:22px 26px; box-shadow:0 1px 0 rgba(0,0,0,.05);
+  display:grid; grid-template-columns:minmax(180px,auto) 1fr; gap:8px 34px; align-items:center;
+}
+.verdict .rating{
+  font-size:40px; line-height:1; font-weight:700; color:var(--sig);
+  letter-spacing:-.02em; text-transform:uppercase;
+}
+.verdict .conv{font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-soft); margin-top:8px;}
+.figs{display:flex; flex-wrap:wrap; gap:30px;}
+.figs .f{min-width:120px;}
+.figs .lbl{font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-soft);}
+.figs .val{font-size:26px; font-weight:600; margin-top:2px;}
+.figs .val u{text-decoration-thickness:2px; text-underline-offset:4px;}
+.upside.pos{color:var(--buy);} .upside.neg{color:var(--sell);}
+
+/* ---------- tabs ---------- */
+nav.tabs{
+  display:flex; flex-wrap:wrap; gap:0; margin:22px 0 0;
+  border-bottom:1px solid var(--rule-strong);
+}
+.tab-btn{
+  appearance:none; background:none; border:none; cursor:pointer;
+  font-family:inherit; font-size:13px; color:var(--ink-soft);
+  padding:9px 14px 8px; border-bottom:3px solid transparent; margin-bottom:-1px;
+  transition:color .18s, border-color .18s;
+}
+.tab-btn:hover{color:var(--accent);}
+.tab-btn .n{
+  font-size:10px; letter-spacing:.1em; color:var(--rule-strong); margin-right:6px;
+}
+.tab-btn.active{color:var(--navy); border-bottom-color:var(--accent); font-weight:600;}
+.tab-btn.active .n{color:var(--accent);}
+
+/* ---------- panels ---------- */
+.panel{display:none; padding:30px 0 46px;}
+.panel.active{display:block; animation:fade .25s ease-out;}
+@keyframes fade{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;}}
+.panel h2{
+  font-size:13px; letter-spacing:.2em; text-transform:uppercase; color:var(--accent);
+  margin:0 0 4px; font-weight:600;
+}
+.panel h2 + .rule{border:0; border-top:2px solid var(--ink); margin:0 0 22px;}
+.panel h3{font-size:19px; margin:30px 0 10px; font-weight:600;}
+.panel p{margin:0 0 14px; max-width:74ch;}
+.narrative :is(p,li){max-width:74ch;}
+.narrative b{font-weight:700;}
+
+/* ---------- tables ---------- */
+.tbl-wrap{overflow-x:auto; margin:18px 0 6px;}
+table{border-collapse:collapse; width:100%; font-size:14px;}
+caption{
+  caption-side:top; text-align:left; font-size:11px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--ink-soft); padding-bottom:7px;
+}
+th,td{padding:7px 12px; border-bottom:1px solid var(--rule); text-align:right;}
+th:first-child,td:first-child{text-align:left;}
+thead th{
+  border-bottom:1.5px solid var(--ink); font-size:11px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--ink-soft); font-weight:600; white-space:nowrap;
+}
+tbody tr:hover{background:rgba(122,31,26,.035);}
+tfoot td{border-top:1.5px solid var(--ink); border-bottom:none; font-weight:700;}
+.f-note{cursor:help; border-bottom:1px dotted var(--rule-strong);}
+.sig-under{color:var(--buy); font-weight:600;}
+.sig-fair{color:var(--hold); font-weight:600;}
+.sig-over{color:var(--sell); font-weight:600;}
+
+/* ---------- callouts ---------- */
+.callout{
+  border-left:4px solid var(--rule-strong); background:var(--paper-2);
+  padding:14px 18px; margin:18px 0; font-size:14.5px;
+}
+.callout.warn{border-left-color:var(--sell); background:#fdf4f2;}
+.callout .tag{
+  display:block; font-size:10px; letter-spacing:.18em; text-transform:uppercase;
+  color:var(--ink-soft); margin-bottom:5px;
+}
+.assumption{font-style:italic; color:var(--ink-soft); font-size:13.5px;}
+
+/* ---------- heatmap ---------- */
+.heat td{text-align:center; font-size:13px; padding:8px 6px; border:1px solid var(--paper);}
+.heat th{text-align:center;}
+.chartbox{margin:22px 0 8px; padding:14px 10px 6px; background:var(--paper-2); border:1px solid var(--rule);}
+canvas{max-width:100%;}
+
+/* ---------- footer ---------- */
+footer{
+  border-top:3px double var(--rule-strong); margin-top:20px;
+  padding:22px 0 46px; font-size:12.5px; color:var(--ink-soft);
+}
+footer b{color:var(--ink);}
+
+@media print{
+  body{background:#fff;}
+  nav.tabs,.tab-btn{display:none !important;}
+  .panel{display:block !important; page-break-after:always; padding-top:18px;}
+  .panel:last-of-type{page-break-after:auto;}
+  header.masthead{background:#fff; color:#000; border-bottom:2px solid #000;}
+  header.masthead h1,.quotebar b{color:#000;}
+  .eyebrow,.subject,.quotebar div{color:#333;}
+  .chartbox{break-inside:avoid;}
+}
+@media (max-width:720px){
+  .verdict{grid-template-columns:1fr;}
+  .wrap{padding:0 18px;}
+  header.masthead h1{font-size:26px;}
+}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wrap">
+    <p class="eyebrow">Valuation &amp; Recommendation Report</p>
+    <h1>{{ company }}</h1>
+    <p class="subject">{{ sector_label }} · Deep-dive valuation · Figures in ₹ Crore unless stated</p>
+    <div class="quotebar">
+      <div>Current Price<b>₹{{ price }}</b></div>
+      <div>Market Cap<b>₹{{ mcap }} Cr</b></div>
+      <div>52-Week Range<b>{{ range_52w }}</b></div>
+      <div>Latest Fiscal Year<b>FY{{ latest_fy }}</b></div>
+      <div>Price As Of<b>{{ as_of }}</b></div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section class="verdict" style="--sig:{{ sig_color }}">
+    <div>
+      <div class="rating">{{ rating }}</div>
+      <div class="conv">Conviction: {{ conviction }}</div>
+    </div>
+    <div class="figs">
+      <div class="f"><div class="lbl">Fair Value</div><div class="val"><u>₹{{ fair_value }}</u></div></div>
+      <div class="f"><div class="lbl">Target Price</div><div class="val"><u>₹{{ target_price }}</u></div></div>
+      <div class="f"><div class="lbl">Implied Move</div>
+        <div class="val upside {{ 'pos' if upside_pct >= 0 else 'neg' }}">{{ upside_str }}</div></div>
+      <div class="f"><div class="lbl">Blended FV</div><div class="val">₹{{ blended_fv }}</div></div>
+    </div>
+  </section>
+
+  <nav class="tabs">
+    {% for t in section_titles %}
+    <button class="tab-btn{% if loop.first %} active{% endif %}" onclick="showTab({{ loop.index }})">
+      <span class="n">{{ '%02d'|format(loop.index) }}</span>{{ t }}
+    </button>
+    {% endfor %}
+  </nav>
+
+  {% for i in range(1, 12) %}
+  <section class="panel{% if i == 1 %} active{% endif %}" id="panel{{ i }}">
+    <h2>Section {{ i }} — {{ section_titles[i-1] }}</h2><hr class="rule">
+    <div class="narrative">{{ sections[i] | safe }}</div>
+    {{ computed[i] | safe }}
+  </section>
+  {% endfor %}
+
+  <footer>
+    <p><b>Data sources.</b> Financial statements: Screener.in export ({{ company }}, FY{{ latest_fy }} and prior).
+       Price and market data: {{ price_source }}{% if as_of %}, close of {{ as_of }}{% endif %}.
+       Qualitative context: company filings supplied by the user.</p>
+    <p><b>Source vs computed.</b> Figures drawn directly from the filings are labelled as reported.
+       All multiples, bands, cash flows, discount rates, model outputs and scenario values are computed
+       by this tool from those inputs; forecast drivers are stated assumptions, not reported figures.
+       Hover a dotted figure to see its formula.</p>
+    <p><b>Analytical method only. Not investment advice.</b> This document is the output of a
+       mechanical valuation model combined with a written interpretation. It is not a personal
+       recommendation, takes no account of any individual's circumstances, and should not be
+       relied upon as the basis for any investment decision.</p>
+  </footer>
+</div>
+
+<script>{{ chartjs_inline | safe }}</script>
+<script>
+function showTab(n){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('panel'+n).classList.add('active');
+  document.querySelectorAll('.tab-btn')[n-1].classList.add('active');
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+const DATA = {{ chart_data | safe }};
+const INK='#16191d', SOFT='#4a5058', RULE='#d8d2c6', ACCENT='#7a1f1a', NAVY='#12283f';
+Chart.defaults.font.family='"Palatino Linotype","Book Antiqua",Palatino,Cambria,Georgia,serif';
+Chart.defaults.font.size=12;
+Chart.defaults.color=SOFT;
+
+function mk(id, cfg){ const el=document.getElementById(id); if(el) new Chart(el, cfg); }
+const gridCfg={grid:{color:RULE, drawTicks:false}, border:{color:RULE}};
+
+window.addEventListener('load', ()=>{
+  if(DATA.band && DATA.band.labels.length){
+    mk('bandChart',{type:'line',
+      data:{labels:DATA.band.labels, datasets:[
+        {label:'P/E', data:DATA.band.pe, borderColor:NAVY, backgroundColor:'rgba(18,40,63,.08)',
+         borderWidth:2, tension:.25, pointRadius:3, fill:true},
+        {label:'Median', data:DATA.band.median, borderColor:ACCENT, borderWidth:1.5,
+         borderDash:[6,4], pointRadius:0},
+        {label:'+1 SD', data:DATA.band.up, borderColor:'#a89f8d', borderWidth:1,
+         borderDash:[3,3], pointRadius:0},
+        {label:'−1 SD', data:DATA.band.dn, borderColor:'#a89f8d', borderWidth:1,
+         borderDash:[3,3], pointRadius:0},
+        {label:'Current', data:DATA.band.current, borderColor:'#1c6b45', borderWidth:2,
+         pointRadius:0}]},
+      options:{responsive:true, plugins:{legend:{position:'bottom', labels:{boxWidth:14, padding:14}}},
+        scales:{x:gridCfg, y:{...gridCfg, title:{display:true, text:'P/E (x)'}}}}});
+  }
+  if(DATA.scen && DATA.scen.labels.length){
+    mk('scenChart',{type:'bar',
+      data:{labels:DATA.scen.labels, datasets:[
+        {label:'Fair value (₹)', data:DATA.scen.values,
+         backgroundColor:['rgba(155,44,34,.75)','rgba(18,40,63,.8)','rgba(28,107,69,.75)'],
+         borderWidth:0, barPercentage:.6},
+        {type:'line', label:'Current price', data:DATA.scen.current,
+         borderColor:ACCENT, borderWidth:2, borderDash:[6,4], pointRadius:0}]},
+      options:{responsive:true, plugins:{legend:{position:'bottom', labels:{boxWidth:14, padding:14}}},
+        scales:{x:gridCfg, y:{...gridCfg, title:{display:true, text:'₹ per share'}}}}});
+  }
+  if(DATA.tri && DATA.tri.labels.length){
+    mk('triChart',{type:'bar',
+      data:{labels:DATA.tri.labels, datasets:[
+        {label:'Method fair value (₹)', data:DATA.tri.values,
+         backgroundColor:'rgba(18,40,63,.78)', borderWidth:0, barPercentage:.55},
+        {type:'line', label:'Blended', data:DATA.tri.blended,
+         borderColor:'#1c6b45', borderWidth:2, borderDash:[6,4], pointRadius:0},
+        {type:'line', label:'Current price', data:DATA.tri.current,
+         borderColor:ACCENT, borderWidth:2, pointRadius:0}]},
+      options:{indexAxis:'y', responsive:true,
+        plugins:{legend:{position:'bottom', labels:{boxWidth:14, padding:14}}},
+        scales:{x:{...gridCfg, title:{display:true, text:'₹ per share'}}, y:gridCfg}}});
+  }
+  if(DATA.peer && DATA.peer.labels.length){
+    mk('peerChart',{type:'bar',
+      data:{labels:DATA.peer.labels, datasets:[
+        {label:DATA.peer.metric, data:DATA.peer.values,
+         backgroundColor:DATA.peer.colors, borderWidth:0, barPercentage:.6}]},
+      options:{responsive:true, plugins:{legend:{display:false}},
+        scales:{x:gridCfg, y:{...gridCfg, title:{display:true, text:DATA.peer.metric}}}}});
+  }
+  if(DATA.fcf && DATA.fcf.labels.length){
+    mk('fcfChart',{type:'bar',
+      data:{labels:DATA.fcf.labels, datasets:[
+        {label:'FCFF (₹ Cr)', data:DATA.fcf.values,
+         backgroundColor:DATA.fcf.values.map(v=>v<0?'rgba(155,44,34,.75)':'rgba(28,107,69,.75)'),
+         borderWidth:0, barPercentage:.6}]},
+      options:{responsive:true, plugins:{legend:{display:false}},
+        scales:{x:gridCfg, y:{...gridCfg, title:{display:true, text:'₹ Crore'}}}}});
+  }
+});
+</script>
+</body>
+</html>

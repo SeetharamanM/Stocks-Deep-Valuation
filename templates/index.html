@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deep Valuation — Report Generator</title>
+<style>
+:root{--paper:#f7f4ee;--paper-2:#fffdf9;--ink:#16191d;--soft:#4a5058;
+      --rule:#d8d2c6;--rule-2:#a89f8d;--navy:#12283f;--accent:#7a1f1a;}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:"Palatino Linotype","Book Antiqua",Palatino,Cambria,Charter,Georgia,serif;
+  font-size:16px;line-height:1.55;}
+header{background:var(--navy);color:#f3efe6;padding:30px 0 24px;
+  border-bottom:3px double var(--rule-2);}
+.wrap{max-width:760px;margin:0 auto;padding:0 28px;}
+.eyebrow{font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:#9db3c9;margin:0 0 8px;}
+h1{margin:0;font-size:30px;font-weight:600;letter-spacing:-.01em;}
+.sub{color:#c6d4e2;font-style:italic;margin:6px 0 0;font-size:15px;}
+form{padding:30px 0 60px;}
+fieldset{border:1px solid var(--rule);background:var(--paper-2);padding:20px 22px;margin:0 0 22px;}
+legend{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);
+  padding:0 8px;font-weight:600;}
+label{display:block;font-size:12px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--soft);margin:14px 0 5px;}
+input,select{width:100%;padding:9px 10px;font-family:inherit;font-size:15px;
+  background:#fff;border:1px solid var(--rule-2);color:var(--ink);}
+input:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px;}
+input[type=file]{padding:7px;font-size:13px;background:var(--paper);}
+.row{display:flex;gap:16px;flex-wrap:wrap;}
+.row>div{flex:1;min-width:150px;}
+.hint{font-size:13px;color:var(--soft);font-style:italic;margin:6px 0 0;}
+button{margin-top:8px;padding:13px 30px;font-family:inherit;font-size:16px;
+  background:var(--navy);color:#f3efe6;border:none;cursor:pointer;letter-spacing:.04em;
+  transition:background .18s;}
+button:hover{background:var(--accent);}
+.warn{border-left:4px solid var(--accent);background:#fdf4f2;padding:12px 16px;
+  font-size:14px;margin:0 0 22px;}
+footer{border-top:1px solid var(--rule);padding:18px 0 40px;font-size:12.5px;color:var(--soft);}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <p class="eyebrow">Analytical tooling</p>
+  <h1>Deep Valuation</h1>
+  <p class="sub">Screener export in, defensible fair value out</p>
+</div></header>
+
+<div class="wrap">
+<form action="/run" method="post" enctype="multipart/form-data">
+
+  {% if not backends %}
+  <p class="warn"><b>No LLM API key detected.</b> Copy <code>.env.example</code> to
+  <code>.env</code> and set <code>ANTHROPIC_API_KEY</code> or <code>DEEPSEEK_API_KEY</code>.
+  Metrics will compute without one, but the written analysis will fail.</p>
+  {% endif %}
+
+  <fieldset>
+    <legend>Company</legend>
+    <label for="stock_name">Stock name</label>
+    <input id="stock_name" name="stock_name" required placeholder="Aurionpro Solutions">
+    <div class="row">
+      <div>
+        <label for="ticker">Ticker</label>
+        <input id="ticker" name="ticker" required placeholder="AURIONPRO">
+      </div>
+      <div>
+        <label for="exchange">Exchange</label>
+        <select id="exchange" name="exchange"><option>NSE</option><option>BSE</option></select>
+      </div>
+    </div>
+    <label for="sector">Business type — selects the intrinsic model</label>
+    <select id="sector" name="sector">
+      <option value="non-financial">Non-financial — DCF</option>
+      <option value="bank-nbfc">Bank / NBFC — justified P/B</option>
+      <option value="amc">Asset manager — P/E and P/AUM</option>
+      <option value="conglomerate">Conglomerate — sum-of-the-parts</option>
+    </select>
+    <p class="hint">Banks and NBFCs suppress ROCE, EV/EBITDA and capex measures, which do not
+       apply to them.</p>
+  </fieldset>
+
+  <fieldset>
+    <legend>Data files</legend>
+    <label for="xlsx">Screener.in export (.xlsx) — required</label>
+    <input id="xlsx" type="file" name="xlsx" accept=".xlsx" required>
+    <label for="annual_report">Annual report (.pdf) — optional</label>
+    <input id="annual_report" type="file" name="annual_report" accept=".pdf">
+    <label for="transcript">Earnings call transcript (.pdf) — optional</label>
+    <input id="transcript" type="file" name="transcript" accept=".pdf">
+    <p class="hint">PDFs supply qualitative context only. Every number comes from the
+       spreadsheet and the market data below.</p>
+  </fieldset>
+
+  <fieldset>
+    <legend>Market data — blank fields are fetched automatically</legend>
+    <div class="row">
+      <div><label for="price">Current price (₹)</label><input id="price" name="price"></div>
+      <div><label for="market_cap">Market cap (₹ Cr)</label><input id="market_cap" name="market_cap"></div>
+    </div>
+    <div class="row">
+      <div><label for="low_52w">52-week low</label><input id="low_52w" name="low_52w"></div>
+      <div><label for="high_52w">52-week high</label><input id="high_52w" name="high_52w"></div>
+      <div><label for="beta">Beta</label><input id="beta" name="beta"></div>
+    </div>
+    <p class="hint">Fetched from Yahoo Finance when left blank. Indian coverage can be patchy —
+       anything it cannot supply is reported as unavailable rather than guessed, so override
+       here when you have better data.</p>
+  </fieldset>
+
+  <fieldset>
+    <legend>Discount rate inputs</legend>
+    <div class="row">
+      <div>
+        <label for="risk_free_rate">Risk-free rate (10-yr G-Sec, decimal)</label>
+        <input id="risk_free_rate" name="risk_free_rate" placeholder="{{ '%.3f'|format(config_rf) if config_rf else '0.069' }}">
+      </div>
+      <div>
+        <label for="equity_risk_premium">Equity risk premium (decimal)</label>
+        <input id="equity_risk_premium" name="equity_risk_premium" placeholder="0.055">
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Analysis engine</legend>
+    <label for="llm_backend">Model</label>
+    <select id="llm_backend" name="llm_backend">
+      {% for b in backends %}<option value="{{ b }}">{{ b }}</option>{% endfor %}
+      {% if not backends %}<option value="claude">claude — no key configured</option>{% endif %}
+    </select>
+    <p class="hint">The model chooses forecast assumptions and writes the commentary.
+       All arithmetic is done in Python and recomputed after the model's assumptions are read,
+       so no figure in the report originates from the model.</p>
+  </fieldset>
+
+  <button type="submit">Generate report</button>
+  <p class="hint">A full run takes a minute or two, most of it waiting on the model.</p>
+</form>
+
+<footer>Analytical method only. Not investment advice.</footer>
+</div>
+</body>
+</html>

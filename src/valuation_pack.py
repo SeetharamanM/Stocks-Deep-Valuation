@@ -259,14 +259,20 @@ def build_pack(fin, md, sector, rf, erp, dcf_overrides=None):
                 **res, **dcf_common,
             }
         else:
+            sens_waccs = [w - 0.02, w - 0.01, w, w + 0.01, w + 0.02]
+            sens_gs = [max(terminal_growth - 0.02, -0.5), terminal_growth - 0.01,
+                       terminal_growth, terminal_growth + 0.01, terminal_growth + 0.02]
             grid = sensitivity_grid_drivers(
-                base_revenue, drivers,
-                waccs=[w - 0.02, w - 0.01, w, w + 0.01, w + 0.02],
-                gs=[max(terminal_growth - 0.02, -0.5), terminal_growth - 0.01,
-                    terminal_growth, terminal_growth + 0.01, terminal_growth + 0.02],
+                base_revenue, drivers, waccs=sens_waccs, gs=sens_gs,
                 net_debt=net_debt, shares=shares, terminal_capex_pct=terminal_capex_pct,
             )
-            dcf_pack = {"viable": True, **res, "sensitivity_grid": grid, **dcf_common}
+            # Store the axes with the grid; a heat map without labelled axes
+            # cannot be read, and the report renders this as a matrix.
+            dcf_pack = {
+                "viable": True, **res,
+                "sensitivity_grid": {"grid": grid, "waccs": sens_waccs, "gs": sens_gs},
+                **dcf_common,
+            }
     except ValueError as e:
         dcf_pack = {"viable": False, "reason": f"DCF inputs invalid: {e}", **dcf_common}
 
