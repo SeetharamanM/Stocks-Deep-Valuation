@@ -69,14 +69,29 @@ class _Msg:
         self.content = blocks
 
 
+class _Stream:
+    """Context manager mimicking client.messages.stream(...)."""
+    def __init__(self, msg):
+        self._msg = msg
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def get_final_message(self):
+        return self._msg
+
+
 def test_extended_thinking_response_is_parsed(monkeypatch):
     """Reasoning models put a ThinkingBlock first; the text block follows."""
     import src.llm_client as mod
 
     class FakeMessages:
-        def create(self, **kw):
-            return _Msg([_Block("thinking", thinking="pondering the drivers..."),
-                         _Block("text", text='{"rating": "HOLD"}')])
+        def stream(self, **kw):
+            return _Stream(_Msg([_Block("thinking", thinking="pondering the drivers..."),
+                         _Block("text", text='{"rating": "HOLD"}')]))
 
     class FakeAnthropic:
         def __init__(self, api_key=None):
@@ -92,10 +107,10 @@ def test_multiple_text_blocks_are_joined(monkeypatch):
     import src.llm_client as mod
 
     class FakeMessages:
-        def create(self, **kw):
-            return _Msg([_Block("thinking", thinking="..."),
+        def stream(self, **kw):
+            return _Stream(_Msg([_Block("thinking", thinking="..."),
                          _Block("text", text='{"a": 1,'),
-                         _Block("text", text=' "b": 2}')])
+                         _Block("text", text=' "b": 2}')]))
 
     class FakeAnthropic:
         def __init__(self, api_key=None):
@@ -111,8 +126,8 @@ def test_response_with_no_text_block_raises_clearly(monkeypatch):
     import src.llm_client as mod
 
     class FakeMessages:
-        def create(self, **kw):
-            return _Msg([_Block("thinking", thinking="only thinking")])
+        def stream(self, **kw):
+            return _Stream(_Msg([_Block("thinking", thinking="only thinking")]))
 
     class FakeAnthropic:
         def __init__(self, api_key=None):
@@ -143,11 +158,11 @@ def test_persistent_truncation_escalates_then_reports_clearly(monkeypatch):
     budgets = []
 
     class FakeMessages:
-        def create(self, **kw):
+        def stream(self, **kw):
             budgets.append(kw["max_tokens"])
             m = _Msg([_Block("text", text='{"partial": ')])
             m.stop_reason = "max_tokens"
-            return m
+            return _Stream(m)
 
     class FakeAnthropic:
         def __init__(self, api_key=None):
@@ -217,12 +232,12 @@ def test_truncation_retries_with_a_larger_budget(monkeypatch):
     attempts = []
 
     class FakeMessages:
-        def create(self, **kw):
+        def stream(self, **kw):
             attempts.append(kw["max_tokens"])
             m = _Msg([_Block("text", text='{"ok": true}')])
             # truncate on the first, smaller budget only
             m.stop_reason = "max_tokens" if len(attempts) == 1 else "end_turn"
-            return m
+            return _Stream(m)
 
     class FakeAnthropic:
         def __init__(self, api_key=None):
@@ -240,11 +255,11 @@ def test_truncation_gives_up_at_the_cap(monkeypatch):
     attempts = []
 
     class FakeMessages:
-        def create(self, **kw):
+        def stream(self, **kw):
             attempts.append(kw["max_tokens"])
             m = _Msg([_Block("text", text='{"partial":')])
             m.stop_reason = "max_tokens"
-            return m
+            return _Stream(m)
 
     class FakeAnthropic:
         def __init__(self, api_key=None):

@@ -102,6 +102,9 @@ class LLMClient:
     # escalate automatically rather than making the user tune it by hand.
     DEFAULT_MAX_TOKENS = 32000
     MAX_TOKENS_CAP = 64000
+    # DeepSeek and other OpenAI-compatible endpoints cap output far lower.
+    OPENAI_COMPAT_MAX_TOKENS = 8192
+    REQUEST_TIMEOUT = 900.0
 
     def __init__(self, backend, model, api_key, base_url=None, max_tokens=None):
         self.backend = backend
@@ -121,9 +124,12 @@ class LLMClient:
             client = anthropic.Anthropic(api_key=self.api_key)
             budget = self.max_tokens
             while True:
-                msg = client.messages.create(
-                    model=self.model, max_tokens=budget, system=system,
-                    messages=[{"role": "user", "content": user}])
+                # Streaming is mandatory at these budgets: the SDK refuses a
+                # non-streaming request that could exceed its ten-minute cap.
+                with client.messages.stream(
+                        model=self.model, max_tokens=budget, system=system,
+                        messages=[{"role": "user", "content": user}]) as stream:
+                    msg = stream.get_final_message()
                 if getattr(msg, "stop_reason", None) != "max_tokens":
                     return _text_of(msg)
                 if budget >= self.MAX_TOKENS_CAP:
@@ -135,12 +141,24 @@ class LLMClient:
                     )
                 budget = min(budget * 2, self.MAX_TOKENS_CAP)
         OpenAI = _require("openai", "deepseek").OpenAI
-        client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+        client = OpenAI(api_key=self.api_key, base_url=self.base_url,
+                        timeout=self.REQUEST_TIMEOUT)
+        # DeepSeek caps output well below the Anthropic budget, so ask for its
+        # maximum rather than the configured one and surface truncation.
         r = client.chat.completions.create(
             model=self.model,
+            max_tokens=min(self.max_tokens, self.OPENAI_COMPAT_MAX_TOKENS),
             messages=[{"role": "system", "content": system},
                       {"role": "user", "content": user}])
-        return r.choices[0].message.content
+        choice = r.choices[0]
+        if getattr(choice, "finish_reason", None) == "length":
+            raise ValueError(
+                "The model's reply was cut off at its output limit mid-JSON. "
+                "This backend caps output at "
+                f"{self.OPENAI_COMPAT_MAX_TOKENS} tokens, which is too small for the "
+                "requested response; use the Claude backend for the narrative pass."
+            )
+        return choice.message.content
 
     def complete_json(self, system, user):
         txt = self._raw_complete(system, user)
