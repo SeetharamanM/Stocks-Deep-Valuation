@@ -184,3 +184,41 @@ def returns_and_ceilings(fin):
     g_reinvest = reinvest * roic if roic is not None else None
     return {"roe": roe, "payout_ratio": payout, "sgr": sgr,
             "roic": roic, "g_from_reinvestment": g_reinvest}
+
+
+def triangulate(methods):
+    """Weighted blend of fair-value estimates from different methods.
+
+    Methods whose `value` is None (a method that couldn't be computed, e.g.
+    a non-viable DCF) are dropped rather than silently treated as 0 or
+    excluded without a trace; the remaining weights are renormalised so the
+    blend is still a proper weighted average, and the dropped method names
+    are recorded under `dropped` so the report can disclose the omission.
+    """
+    usable = [m for m in methods if m.get("value") is not None]
+    dropped = [m["name"] for m in methods if m.get("value") is None]
+    tw = sum(m["weight"] for m in usable)
+    blended = sum(m["value"]*m["weight"] for m in usable) / tw if tw else None
+    vals = [m["value"] for m in usable]
+    return {"methods": methods, "blended": blended,
+            "low": min(vals) if vals else None,
+            "high": max(vals) if vals else None,
+            "total_weight": tw, "dropped": dropped}
+
+
+def scenario_expected_value(scenarios, current_price):
+    """Probability-weighted expected value across bear/base/bull scenarios.
+
+    Probabilities that don't sum to 1.0 (within a 0.01 tolerance) are not
+    silently accepted: `prob_sum` records the actual sum and `prob_sum_ok`
+    flags whether it's within tolerance, so the report can disclose a
+    mis-specified scenario set rather than presenting a quietly-wrong
+    expected value as if it were sound.
+    """
+    ev = sum(s["value"]*s["prob"] for s in scenarios)
+    for s in scenarios:
+        s["move_pct"] = (s["value"]/current_price - 1) if current_price else None
+    prob_sum = sum(s["prob"] for s in scenarios)
+    return {"scenarios": scenarios, "expected_value": ev,
+            "upside_pct": (ev/current_price - 1) if current_price else None,
+            "prob_sum": prob_sum, "prob_sum_ok": abs(prob_sum - 1.0) <= 0.01}
