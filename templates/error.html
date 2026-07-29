@@ -27,6 +27,9 @@ ul{color:#4a5058;font-size:15px;}
   <div class="msg">{{ error }}</div>
   <p>Common causes:</p>
   <ul>
+    <li><b>A missing package</b> (“No module named …”). Several Pythons are often installed
+        side by side; dependencies must go into the one running this app. The message above
+        names that interpreter and the exact install command.</li>
     <li>No API key set — copy <code>.env.example</code> to <code>.env</code> and fill in
         <code>ANTHROPIC_API_KEY</code> or <code>DEEPSEEK_API_KEY</code>.</li>
     <li>The spreadsheet is not a Screener.in export, or its layout differs from the

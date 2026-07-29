@@ -32,3 +32,23 @@ def test_missing_api_key_raises_before_network():
         assert "api key" in str(e).lower()
     else:
         raise AssertionError("expected ValueError for missing API key")
+
+
+def test_missing_sdk_names_the_running_interpreter(monkeypatch):
+    """A missing package must not send the user to the wrong Python."""
+    import sys
+
+    def fake_import(name, *a, **k):
+        raise ModuleNotFoundError(f"No module named {name!r}")
+
+    monkeypatch.setattr("importlib.import_module", fake_import)
+    c = get_client(backend="deepseek", model="m", api_key="key", base_url="u")
+    try:
+        c._raw_complete("s", "u")
+    except ModuleNotFoundError as e:
+        msg = str(e)
+        assert "openai" in msg
+        assert sys.executable in msg, "must name the interpreter actually running"
+        assert "pip install" in msg
+    else:
+        raise AssertionError("expected ModuleNotFoundError")
