@@ -16,3 +16,9 @@ def test_historical_bands():
     assert hb["sd_pe"] >= 0
     assert "current_z" in hb
     assert hb["upper_band"] > hb["median_pe_10y"] > hb["lower_band"]
+
+def test_band_skew_disclosure():
+    fin = parse_screener("Aurionpro Sol.xlsx")
+    hb = historical_bands(fin)
+    assert hb["lower_band_display"] >= 0.0
+    assert hb["band_skewed"] is True   # Aurionpro's P/E series is right-skewed

@@ -25,3 +25,11 @@ def test_adjusted_shares_and_yearend_price():
     fin = parse_screener(XLSX)
     assert abs(fin.adjusted_shares_cr[-1] - 5.53) < 0.01
     assert abs(fin.yearend_price[-1] - 724.7) < 0.01
+
+def test_fixed_asset_rows_parsed():
+    fin = parse_screener(XLSX)
+    bs = {y.year: y for y in fin.bs_years}
+    assert abs(bs[2026].net_block - 891.9) < 0.01
+    assert abs(bs[2025].net_block - 731.55) < 0.01
+    assert abs(bs[2025].cwip - 20.39) < 0.01
+    assert bs[2026].cwip == 0.0   # blank in source -> 0.0, not None

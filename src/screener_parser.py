@@ -11,6 +11,7 @@ class PnLYear:
 class BSYear:
     year: int; equity_capital: float; reserves: float; borrowings: float
     cash: float; shares_count: float
+    net_block: float = 0.0; cwip: float = 0.0; investments: float = 0.0
 
 @dataclass
 class CFYear:
@@ -76,8 +77,11 @@ def parse_screener(path):
     def brow(lbl): return _series(ws, _find_row(ws, lbl, 55, 79), bs_cols)
     eq, res, bor = brow("Equity Share Capital"), brow("Reserves"), brow("Borrowings")
     cash, shr = brow("Cash & Bank"), brow("No. of Equity Shares")
+    net_block, cwip, investments = brow("Net Block"), brow("Capital Work in Progress"), brow("Investments")
     bs_years = [BSYear(bs_years_list[i], eq[i] or 0, res[i] or 0, bor[i] or 0,
-                       cash[i] or 0, shr[i] or 0) for i in range(len(bs_years_list))
+                       cash[i] or 0, shr[i] or 0,
+                       net_block[i] or 0.0, cwip[i] or 0.0, investments[i] or 0.0)
+                for i in range(len(bs_years_list))
                 if (res[i] is not None or eq[i] is not None)]
 
     cf_dt = _find_row(ws, "Report Date", 80, 89)

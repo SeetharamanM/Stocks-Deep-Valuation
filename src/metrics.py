@@ -5,35 +5,65 @@ def _shares(fin):
     return fin.adjusted_shares_cr[-1]
 
 
-def _capex_and_fcf(cf):
-    """Derive a capex proxy and FCF for one CFYear.
+def _capex_from_movement(bs_t, bs_prev, dep_t):
+    """Estimate capex for year t from the fixed-asset-movement identity:
 
-    Capex is not itemised in the Screener Data Sheet, so we proxy it as the
-    magnitude of Cash-from-Investing (CFI). This is a real approximation:
-    CFI also bundles acquisitions and purchases/sales of investments, so FCF
-    computed this way can be badly understated (or overstated) for an
-    acquisitive company or one that parks cash in investments. The method
-    string is kept on every result so downstream reporting can disclose it.
+        capex_t = (NetBlock_t + CWIP_t) - (NetBlock_{t-1} + CWIP_{t-1}) + Depreciation_t
 
-    If CFI is positive (net divestment / net inflow from investing in the
-    year), treating -CFI as capex would produce a nonsensical negative capex
-    that inflates FCF. In that case we treat capex as 0.0 for the year and
-    say so explicitly.
+    This is the standard proxy used when a cash-flow statement doesn't
+    itemise capex separately (as here, where Screener's CFI line bundles
+    capex together with acquisitions and investment purchases/sales). It is
+    still a disclosed ESTIMATE, not a reported figure: it can be thrown off
+    by revaluations, disposals, or reclassifications within Net Block/CWIP
+    that aren't really "capex" in the cash sense.
+
+    A year of net asset disposals (or a data quirk) can make the raw
+    movement negative; that would imply negative capex, which is not a
+    meaningful economic outcome, so the result is clamped to 0.0 and the
+    clamp is disclosed via `capex_clamped`.
     """
-    if cf.cfi is not None and cf.cfi > 0:
-        capex = 0.0
-        method = ("Capex proxy = 0 (CFI was positive/net divestment this "
-                  "year, so -CFI would imply negative capex; treated as no "
-                  "capex). FCF = CFO.")
-    else:
-        capex = -cf.cfi if cf.cfi is not None else 0.0
-        method = ("FCF = CFO - Capex, where Capex is proxied as the full "
-                  "magnitude of Cash-from-Investing (CFI is not broken out "
-                  "into capex vs. acquisitions/investments in this data, so "
-                  "this proxy can understate FCF for acquisitive years or "
-                  "years with large investment purchases).")
-    fcf = cf.cfo - capex
-    return capex, fcf, method
+    nb_t = (bs_t.net_block or 0.0) + (bs_t.cwip or 0.0)
+    nb_prev = (bs_prev.net_block or 0.0) + (bs_prev.cwip or 0.0)
+    raw_capex = nb_t - nb_prev + (dep_t or 0.0)
+    clamped = raw_capex < 0
+    capex = max(raw_capex, 0.0)
+    method = (
+        f"Capex estimated from fixed-asset movement: "
+        f"(NetBlock_{bs_t.year}={bs_t.net_block:.2f} + CWIP_{bs_t.year}={bs_t.cwip:.2f}) - "
+        f"(NetBlock_{bs_prev.year}={bs_prev.net_block:.2f} + CWIP_{bs_prev.year}={bs_prev.cwip:.2f}) + "
+        f"Depreciation_{bs_t.year}={dep_t:.2f} = {raw_capex:.2f}"
+        + (" ; clamped to 0.0 (negative movement implies net disposals, not negative capex)"
+           if clamped else "")
+        + ". This is a disclosed estimate, not a reported capex figure: Screener's "
+          "Cash-from-Investing line is not broken out into capex vs. acquisitions/"
+          "investment purchases, so fixed-asset movement is used as the best available proxy."
+    )
+    return capex, method, clamped
+
+
+def fcf_for_year(fin, year):
+    """Compute FCF for a single fiscal year using capex from fixed-asset
+    movement (see `_capex_from_movement`), matching CF/BS/PnL rows by year.
+
+    Returns None if the year isn't present in all three statements, or if
+    the prior year's balance sheet (needed for the capex movement) isn't
+    available. Both `valuation_base` and `relative_multiples` call this
+    same helper so the FCF figure they report can never disagree.
+    """
+    bs_by_year = {b.year: b for b in fin.bs_years}
+    pnl_by_year = {p.year: p for p in fin.pnl_years}
+    cf_by_year = {c.year: c for c in fin.cf_years}
+    if year not in bs_by_year or year not in pnl_by_year or year not in cf_by_year:
+        return None
+    prev_year = year - 1
+    if prev_year not in bs_by_year:
+        return None
+    bs_t, bs_prev = bs_by_year[year], bs_by_year[prev_year]
+    cf_t, pnl_t = cf_by_year[year], pnl_by_year[year]
+    capex, method, clamped = _capex_from_movement(bs_t, bs_prev, pnl_t.depreciation)
+    fcf = cf_t.cfo - capex
+    return {"year": year, "fcf": fcf, "capex": capex, "cfo": cf_t.cfo,
+            "capex_clamped": clamped, "method": method}
 
 
 def valuation_base(fin):
@@ -44,13 +74,18 @@ def valuation_base(fin):
     q = [v for _, v in fin.quarters_net_profit if v is not None][-4:]
     ttm_np = sum(q) if len(q) == 4 else latest.net_profit
 
+    years_common = sorted(set(y.year for y in fin.cf_years)
+                          & set(y.year for y in fin.bs_years)
+                          & set(y.year for y in fin.pnl_years))
     fcf_series = []
-    for cf in fin.cf_years[-5:]:
-        capex, fcf, method = _capex_and_fcf(cf)
-        fcf_series.append({"year": cf.year, "fcf": fcf, "capex": capex, "method": method})
+    for year in years_common[-5:]:
+        entry = fcf_for_year(fin, year)
+        if entry is not None:
+            fcf_series.append(entry)
 
-    pat_5 = [p.net_profit for p in fin.pnl_years[-5:]]
-    fcf_pat = (sum(x["fcf"] for x in fcf_series) / sum(pat_5)) if sum(pat_5) else None
+    fcf_years = {x["year"] for x in fcf_series}
+    pat_matched = [p.net_profit for p in fin.pnl_years if p.year in fcf_years]
+    fcf_pat = (sum(x["fcf"] for x in fcf_series) / sum(pat_matched)) if sum(pat_matched) else None
 
     return {
         "eps_latest_fy": latest.net_profit / shares,
@@ -81,7 +116,8 @@ def relative_multiples(fin):
     ev = fin.market_cap + bs.borrowings - bs.cash
     ebitda, ebit = _ebitda_ebit(fin, latest)
     bvps = (bs.equity_capital + bs.reserves) / shares
-    _, fcf, _ = _capex_and_fcf(fin.cf_years[-1])
+    fcf_entry = fcf_for_year(fin, latest.year)
+    fcf = fcf_entry["fcf"] if fcf_entry is not None else None
     return {
         "pe_current": price / eps if eps else None,
         "pb_current": price / bvps if bvps else None,
@@ -90,7 +126,7 @@ def relative_multiples(fin):
         "ev_sales_current": ev / latest.sales if latest.sales else None,
         "p_sales_current": fin.market_cap / latest.sales if latest.sales else None,
         "dividend_yield": (latest.dividend / fin.market_cap) if fin.market_cap else None,
-        "fcf_yield": (fcf / fin.market_cap) if fin.market_cap else None,
+        "fcf_yield": (fcf / fin.market_cap) if (fcf is not None and fin.market_cap) else None,
         "enterprise_value": ev,
     }
 
@@ -117,12 +153,15 @@ def historical_bands(fin):
     sd = pstdev(pes10) if len(pes10) > 1 else 0.0
     cur = relative_multiples(fin)["pe_current"]
     z = (cur - med10) / sd if (sd and med10 is not None and cur) else None
+    lower_band = (med10 - sd) if med10 is not None else None
     return {
         "pe_history": pes10,
         "pe_years": years10,
         "median_pe_10y": med10, "median_pe_5y": med5, "sd_pe": sd,
         "upper_band": (med10 + sd) if med10 is not None else None,
-        "lower_band": (med10 - sd) if med10 is not None else None,
+        "lower_band": lower_band,
+        "lower_band_display": max(lower_band, 0.0) if lower_band is not None else None,
+        "band_skewed": (lower_band < 0) if lower_band is not None else False,
         "current_pe": cur, "current_z": z,
     }
 
