@@ -1,6 +1,7 @@
 from src.screener_parser import parse_screener
 from src.web_data import MarketData
 from src.analyst import run_analysis
+from src.prompts import RECOMMENDATION_SECTION
 
 DRIVERS = [
     {"revenue_growth": 0.14, "ebit_margin": 0.172, "tax_rate": 0.20,
@@ -57,7 +58,7 @@ class FakeClient:
                     "rationale": {"drivers": "capex normalises as build-out completes"}}
         wanted = self._requested(system)
         reply = {"sections": {s: f"<p>Section {s}.</p>" for s in wanted}}
-        if "11" in wanted:
+        if str(RECOMMENDATION_SECTION) in wanted:
             reply.update({"rating": "HOLD", "fair_value": 610,
                           "target_price": 640, "conviction": "Medium"})
         return reply
@@ -105,8 +106,8 @@ def test_verdict_comes_from_the_batch_that_writes_the_recommendation():
     run_analysis(fin, md, "non-financial", "", client, 0.069, 0.055)
     # only the final batch's prompt asks for the verdict fields
     verdict_prompts = [s for s in client.seen_system[1:] if '"rating"' in s]
-    assert len(verdict_prompts) == 1
-    assert "9" in FakeClient._requested(verdict_prompts[0])
+    assert len(verdict_prompts) == 1, "exactly one batch may return the verdict"
+    assert str(RECOMMENDATION_SECTION) in FakeClient._requested(verdict_prompts[0])
 
 
 def test_llm_drivers_are_actually_used_in_recomputed_pack():

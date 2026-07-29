@@ -17,7 +17,8 @@ import json
 from src.valuation_pack import build_pack, scenario_values
 from src.metrics import (triangulate, scenario_expected_value,
                          computable_methods, apply_weights)
-from src.prompts import ASSUMPTIONS_SYSTEM, narrative_system, NARRATIVE_BATCHES
+from src.prompts import (ASSUMPTIONS_SYSTEM, narrative_system,
+                         NARRATIVE_BATCHES, RECOMMENDATION_SECTION)
 
 # Keep prompts within a sane token budget; the pack is the important part.
 _PDF_BUDGET_PASS1 = 20000
@@ -72,14 +73,18 @@ def run_analysis(fin, md, sector, pdf_context, client, rf, erp):
         + pdf_context[:_PDF_BUDGET_PASS2]
     )
 
+    # The verdict rides with whichever batch writes section 9 (Recommendation),
+    # so it stays attached to the reasoning that produces it regardless of how
+    # the batches are grouped.
     sections, verdict = {}, {}
     for batch in NARRATIVE_BATCHES:
-        is_last = batch is NARRATIVE_BATCHES[-1]
+        writes_recommendation = RECOMMENDATION_SECTION in batch
         reply = client.complete_json(
-            narrative_system(sections=batch, include_verdict=is_last), user2)
+            narrative_system(sections=batch, include_verdict=writes_recommendation),
+            user2)
         for key, value in (reply.get("sections") or {}).items():
             sections[str(key)] = value
-        if is_last:
+        if writes_recommendation:
             verdict = reply
 
     return {

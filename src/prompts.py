@@ -122,7 +122,9 @@ VERDICT_SHAPE = """,
 # Eleven HTML sections do not fit in one reply on every backend (DeepSeek caps
 # output at 8192 tokens), so the narrative is written in batches. The final
 # batch also returns the verdict fields, since it writes the recommendation.
-NARRATIVE_BATCHES = [(1, 2, 3, 4), (5, 6, 7, 8), (9, 10, 11)]
+# Section 9 is the Recommendation; the verdict fields ride with its batch.
+RECOMMENDATION_SECTION = 9
+NARRATIVE_BATCHES = [(1, 2), (3, 4), (5,), (6, 7), (8, 9), (10, 11)]
 
 
 def narrative_system(sections=None, include_verdict=True):

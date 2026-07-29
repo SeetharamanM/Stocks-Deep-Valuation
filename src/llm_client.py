@@ -136,16 +136,20 @@ class LLMClient:
         truncated = getattr(choice, "finish_reason", None) == "length"
         return (choice.message.content or ""), truncated
 
-    def _raw_complete(self, system, user):
+    def _complete_at(self, system, user, budget):
         if not self.api_key:
             raise ValueError(
                 f"No API key configured for backend {self.backend!r}. "
                 "Set ANTHROPIC_API_KEY or DEEPSEEK_API_KEY in your .env file."
             )
         call = self._call_claude if self.backend == "claude" else self._call_openai_compatible
+        return call(system, user, budget)
+
+    def _raw_complete(self, system, user):
+        """Single completion at the configured budget, escalating on truncation."""
         budget = self.max_tokens
         while True:
-            text, truncated = call(system, user, budget)
+            text, truncated = self._complete_at(system, user, budget)
             if not truncated:
                 return text
             if budget >= self.MAX_TOKENS_CAP:
@@ -157,8 +161,8 @@ class LLMClient:
                 )
             budget = min(budget * 2, self.MAX_TOKENS_CAP)
 
-    def complete_json(self, system, user):
-        txt = self._raw_complete(system, user)
+    @staticmethod
+    def _parse(txt):
         for candidate in _json_candidates(txt):
             try:
                 parsed = json.loads(candidate)
@@ -166,11 +170,44 @@ class LLMClient:
                 continue
             if isinstance(parsed, dict):
                 return parsed
-        raise ValueError(
-            "No JSON object found in the model response. The model may have "
-            "answered in prose instead of the requested JSON. Response began: "
-            f"{txt[:300]!r} ... and ended: {txt[-300:]!r}"
-        )
+        return None
+
+    def complete_json(self, system, user):
+        """Complete and parse, escalating the budget while the reply is cut off.
+
+        A backend does not always set a truncation flag: a reply can open with
+        a valid '{' and simply stop mid-object. Unparseable output that looks
+        like the start of JSON is therefore treated as truncation and retried
+        at a larger budget, rather than reported as "answered in prose".
+        """
+        budget = self.max_tokens
+        while True:
+            txt, flagged = self._complete_at(system, user, budget)
+            parsed = self._parse(txt)
+            at_cap = budget >= self.MAX_TOKENS_CAP
+            if parsed is not None and not flagged:
+                return parsed
+            if parsed is not None:
+                # Parseable but the backend flagged truncation: content may be
+                # semantically incomplete, so retry unless there is no headroom.
+                if at_cap:
+                    return parsed
+                budget = min(budget * 2, self.MAX_TOKENS_CAP)
+                continue
+            looks_truncated = flagged or txt.lstrip().startswith(("{", "```"))
+            if not looks_truncated:
+                raise ValueError(
+                    "No JSON object found in the model response. The model appears "
+                    "to have answered in prose instead of the requested JSON. "
+                    f"Response began: {txt[:300]!r} ... and ended: {txt[-300:]!r}"
+                )
+            if budget >= self.MAX_TOKENS_CAP:
+                raise ValueError(
+                    f"The reply was still cut off mid-JSON at the {budget}-token "
+                    "ceiling. Reduce the number of sections per narrative batch "
+                    f"or the qualitative context. Reply ended: {txt[-300:]!r}"
+                )
+            budget = min(budget * 2, self.MAX_TOKENS_CAP)
 
 
 def get_client(backend, model, api_key, base_url=None, max_tokens=None):

@@ -11,7 +11,7 @@ def test_get_client_selects_backend():
 
 def test_complete_is_mockable(monkeypatch):
     c = get_client(backend="claude", model="m", api_key="x")
-    monkeypatch.setattr(c, "_raw_complete", lambda system, user: '{"ok": true}')
+    monkeypatch.setattr(c, "_complete_at", lambda system, user, budget: ('{"ok": true}', False))
     out = c.complete_json(system="s", user="u")
     assert out == {"ok": True}
 
@@ -19,8 +19,9 @@ def test_complete_is_mockable(monkeypatch):
 def test_complete_json_extracts_from_prose(monkeypatch):
     """Models often wrap JSON in prose or fences; we must still parse it."""
     c = get_client(backend="deepseek", model="m", api_key="x")
-    monkeypatch.setattr(c, "_raw_complete",
-                        lambda system, user: 'Sure!\n```json\n{"a": [1, 2]}\n```\nDone.')
+    monkeypatch.setattr(
+        c, "_complete_at",
+        lambda system, user, budget: ('Sure!\n```json\n{"a": [1, 2]}\n```\nDone.', False))
     assert c.complete_json(system="s", user="u") == {"a": [1, 2]}
 
 
@@ -184,7 +185,7 @@ def test_persistent_truncation_escalates_then_reports_clearly(monkeypatch):
 
 def _client_returning(text, monkeypatch):
     c = get_client(backend="claude", model="m", api_key="k")
-    monkeypatch.setattr(c, "_raw_complete", lambda system, user: text)
+    monkeypatch.setattr(c, "_complete_at", lambda system, user, budget: (text, False))
     return c
 
 
@@ -325,3 +326,58 @@ def test_openai_backend_is_not_throttled_below_configured_budget(monkeypatch):
     c = get_client(backend="deepseek", model="m", api_key="k", max_tokens=32000)
     c._raw_complete("s", "u")
     assert seen["max_tokens"] == 32000
+
+
+def test_unflagged_truncation_is_retried_not_reported_as_prose(monkeypatch):
+    """A reply can open with '{' and stop mid-object without any length flag."""
+    import src.llm_client as mod
+    budgets = []
+
+    class FakeCompletions:
+        def create(self, **kw):
+            budgets.append(kw["max_tokens"])
+            body = ('{"sections": {"5": "<p>long' if len(budgets) == 1
+                    else '{"sections": {"5": "<p>ok</p>"}}')
+            choice = type("C", (), {
+                "finish_reason": "stop",          # no truncation flag at all
+                "message": type("M", (), {"content": body})()})()
+            return type("R", (), {"choices": [choice]})()
+
+    class FakeOpenAI:
+        def __init__(self, **kw):
+            self.chat = type("Chat", (), {"completions": FakeCompletions()})()
+
+    monkeypatch.setattr(mod, "_require",
+                        lambda module, backend: type("M", (), {"OpenAI": FakeOpenAI}))
+    c = get_client(backend="deepseek", model="m", api_key="k", max_tokens=16000)
+    assert c.complete_json("s", "u") == {"sections": {"5": "<p>ok</p>"}}
+    assert budgets == [16000, 32000], f"expected a retry, got {budgets}"
+
+
+def test_genuine_prose_answer_is_not_retried(monkeypatch):
+    """Prose that never looks like JSON should fail fast, not burn retries."""
+    import src.llm_client as mod
+    calls = []
+
+    class FakeCompletions:
+        def create(self, **kw):
+            calls.append(kw["max_tokens"])
+            choice = type("C", (), {
+                "finish_reason": "stop",
+                "message": type("M", (), {"content": "I think the company is fine."})()})()
+            return type("R", (), {"choices": [choice]})()
+
+    class FakeOpenAI:
+        def __init__(self, **kw):
+            self.chat = type("Chat", (), {"completions": FakeCompletions()})()
+
+    monkeypatch.setattr(mod, "_require",
+                        lambda module, backend: type("M", (), {"OpenAI": FakeOpenAI}))
+    c = get_client(backend="deepseek", model="m", api_key="k")
+    try:
+        c.complete_json("s", "u")
+    except ValueError as e:
+        assert "prose" in str(e).lower()
+    else:
+        raise AssertionError("expected ValueError")
+    assert len(calls) == 1, "must not retry a genuine prose answer"
