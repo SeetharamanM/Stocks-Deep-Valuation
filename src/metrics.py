@@ -222,3 +222,17 @@ def scenario_expected_value(scenarios, current_price):
     return {"scenarios": scenarios, "expected_value": ev,
             "upside_pct": (ev/current_price - 1) if current_price else None,
             "prob_sum": prob_sum, "prob_sum_ok": abs(prob_sum - 1.0) <= 0.01}
+
+
+def justified_pb(roe, g, coe):
+    """Justified (Gordon-growth) P/B = (ROE - g) / (CoE - g).
+
+    Used for banks/NBFCs, where EV/EBITDA and P/Sales are not meaningful
+    (a bank's "sales" is interest income, and there's no separable
+    operating EBITDA). Returns None when CoE == g, since the formula's
+    denominator is undefined there.
+    """
+    denom = coe - g
+    if abs(denom) < 1e-9:
+        return None
+    return (roe - g) / denom
