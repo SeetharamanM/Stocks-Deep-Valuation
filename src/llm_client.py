@@ -35,12 +35,38 @@ def _require(module, backend):
         ) from exc
 
 
+def _text_of(message):
+    """Concatenate the text blocks of an Anthropic response.
+
+    Reasoning models emit a ThinkingBlock before the answer, so the first
+    content block is not necessarily text and carries no `.text` attribute.
+    Collect every text block rather than indexing blindly.
+    """
+    parts = [getattr(b, "text", None) for b in getattr(message, "content", [])
+             if getattr(b, "type", None) == "text"]
+    parts = [p for p in parts if p]
+    if not parts:
+        kinds = [getattr(b, "type", "?") for b in getattr(message, "content", [])]
+        raise ValueError(
+            "The model returned no text block; content blocks were: "
+            f"{kinds or 'none'}. If the response was cut off mid-thought, the "
+            "token budget may be too small for the requested reasoning."
+        )
+    return "".join(parts)
+
+
 class LLMClient:
-    def __init__(self, backend, model, api_key, base_url=None):
+    # The narrative pass emits eleven HTML sections in one response, and on
+    # reasoning models the thinking tokens draw from this same budget. Too
+    # small a ceiling truncates the JSON mid-object.
+    DEFAULT_MAX_TOKENS = 16000
+
+    def __init__(self, backend, model, api_key, base_url=None, max_tokens=None):
         self.backend = backend
         self.model = model
         self.api_key = api_key
         self.base_url = base_url
+        self.max_tokens = max_tokens or self.DEFAULT_MAX_TOKENS
 
     def _raw_complete(self, system, user):
         if not self.api_key:
@@ -52,9 +78,14 @@ class LLMClient:
             anthropic = _require("anthropic", "claude")
             client = anthropic.Anthropic(api_key=self.api_key)
             msg = client.messages.create(
-                model=self.model, max_tokens=8000, system=system,
+                model=self.model, max_tokens=self.max_tokens, system=system,
                 messages=[{"role": "user", "content": user}])
-            return msg.content[0].text
+            if getattr(msg, "stop_reason", None) == "max_tokens":
+                raise ValueError(
+                    f"The model hit the {self.max_tokens}-token output ceiling and its "
+                    "reply was cut off mid-JSON. Raise LLM_MAX_TOKENS in .env and retry."
+                )
+            return _text_of(msg)
         OpenAI = _require("openai", "deepseek").OpenAI
         client = OpenAI(api_key=self.api_key, base_url=self.base_url)
         r = client.chat.completions.create(
@@ -77,5 +108,5 @@ class LLMClient:
             return json.loads(braces.group(0))
 
 
-def get_client(backend, model, api_key, base_url=None):
-    return LLMClient(backend, model, api_key, base_url)
+def get_client(backend, model, api_key, base_url=None, max_tokens=None):
+    return LLMClient(backend, model, api_key, base_url, max_tokens)

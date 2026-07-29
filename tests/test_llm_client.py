@@ -52,3 +52,108 @@ def test_missing_sdk_names_the_running_interpreter(monkeypatch):
         assert "pip install" in msg
     else:
         raise AssertionError("expected ModuleNotFoundError")
+
+
+class _Block:
+    """Mimics an SDK content block: thinking blocks carry no .text."""
+    def __init__(self, type_, text=None, thinking=None):
+        self.type = type_
+        if text is not None:
+            self.text = text
+        if thinking is not None:
+            self.thinking = thinking
+
+
+class _Msg:
+    def __init__(self, blocks):
+        self.content = blocks
+
+
+def test_extended_thinking_response_is_parsed(monkeypatch):
+    """Reasoning models put a ThinkingBlock first; the text block follows."""
+    import src.llm_client as mod
+
+    class FakeMessages:
+        def create(self, **kw):
+            return _Msg([_Block("thinking", thinking="pondering the drivers..."),
+                         _Block("text", text='{"rating": "HOLD"}')])
+
+    class FakeAnthropic:
+        def __init__(self, api_key=None):
+            self.messages = FakeMessages()
+
+    monkeypatch.setattr(mod, "_require",
+                        lambda module, backend: type("M", (), {"Anthropic": FakeAnthropic}))
+    c = get_client(backend="claude", model="claude-opus-5", api_key="k")
+    assert c.complete_json("s", "u") == {"rating": "HOLD"}
+
+
+def test_multiple_text_blocks_are_joined(monkeypatch):
+    import src.llm_client as mod
+
+    class FakeMessages:
+        def create(self, **kw):
+            return _Msg([_Block("thinking", thinking="..."),
+                         _Block("text", text='{"a": 1,'),
+                         _Block("text", text=' "b": 2}')])
+
+    class FakeAnthropic:
+        def __init__(self, api_key=None):
+            self.messages = FakeMessages()
+
+    monkeypatch.setattr(mod, "_require",
+                        lambda module, backend: type("M", (), {"Anthropic": FakeAnthropic}))
+    c = get_client(backend="claude", model="claude-opus-5", api_key="k")
+    assert c.complete_json("s", "u") == {"a": 1, "b": 2}
+
+
+def test_response_with_no_text_block_raises_clearly(monkeypatch):
+    import src.llm_client as mod
+
+    class FakeMessages:
+        def create(self, **kw):
+            return _Msg([_Block("thinking", thinking="only thinking")])
+
+    class FakeAnthropic:
+        def __init__(self, api_key=None):
+            self.messages = FakeMessages()
+
+    monkeypatch.setattr(mod, "_require",
+                        lambda module, backend: type("M", (), {"Anthropic": FakeAnthropic}))
+    c = get_client(backend="claude", model="claude-opus-5", api_key="k")
+    try:
+        c._raw_complete("s", "u")
+    except ValueError as e:
+        assert "no text" in str(e).lower()
+    else:
+        raise AssertionError("expected ValueError")
+
+
+def test_get_client_forwards_max_tokens():
+    c = get_client(backend="claude", model="m", api_key="k", max_tokens=32000)
+    assert c.max_tokens == 32000
+    assert get_client(backend="claude", model="m", api_key="k").max_tokens == 16000
+
+
+def test_truncated_response_raises_actionable_error(monkeypatch):
+    import src.llm_client as mod
+
+    class FakeMessages:
+        def create(self, **kw):
+            m = _Msg([_Block("text", text='{"partial": ')])
+            m.stop_reason = "max_tokens"
+            return m
+
+    class FakeAnthropic:
+        def __init__(self, api_key=None):
+            self.messages = FakeMessages()
+
+    monkeypatch.setattr(mod, "_require",
+                        lambda module, backend: type("M", (), {"Anthropic": FakeAnthropic}))
+    c = get_client(backend="claude", model="m", api_key="k")
+    try:
+        c._raw_complete("s", "u")
+    except ValueError as e:
+        assert "LLM_MAX_TOKENS" in str(e)
+    else:
+        raise AssertionError("expected ValueError on truncation")

@@ -15,6 +15,7 @@ class Config:
     DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
     DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
     ALPHAVANTAGE_API_KEY = os.getenv("ALPHAVANTAGE_API_KEY", "")
+    LLM_MAX_TOKENS = int(_f("LLM_MAX_TOKENS", 16000))
     RISK_FREE_RATE = _f("RISK_FREE_RATE", 0.069)
     EQUITY_RISK_PREMIUM = _f("EQUITY_RISK_PREMIUM", 0.055)
     STATUTORY_TAX = _f("STATUTORY_TAX", 0.2517)

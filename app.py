@@ -71,9 +71,11 @@ def _default_pipeline(form, files, out_dir):
     backend = form.get("llm_backend") or config.LLM_BACKEND
     if backend == "deepseek":
         client = get_client("deepseek", config.DEEPSEEK_MODEL,
-                            config.DEEPSEEK_API_KEY, config.DEEPSEEK_BASE_URL)
+                            config.DEEPSEEK_API_KEY, config.DEEPSEEK_BASE_URL,
+                            max_tokens=config.LLM_MAX_TOKENS)
     else:
-        client = get_client("claude", config.ANTHROPIC_MODEL, config.ANTHROPIC_API_KEY)
+        client = get_client("claude", config.ANTHROPIC_MODEL, config.ANTHROPIC_API_KEY,
+                            max_tokens=config.LLM_MAX_TOKENS)
 
     rf = _float_or_none(form.get("risk_free_rate")) or config.RISK_FREE_RATE
     erp = _float_or_none(form.get("equity_risk_premium")) or config.EQUITY_RISK_PREMIUM
