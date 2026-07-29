@@ -130,16 +130,21 @@ def test_response_with_no_text_block_raises_clearly(monkeypatch):
 
 
 def test_get_client_forwards_max_tokens():
-    c = get_client(backend="claude", model="m", api_key="k", max_tokens=32000)
-    assert c.max_tokens == 32000
-    assert get_client(backend="claude", model="m", api_key="k").max_tokens == 16000
-
-
-def test_truncated_response_raises_actionable_error(monkeypatch):
     import src.llm_client as mod
+    c = get_client(backend="claude", model="m", api_key="k", max_tokens=48000)
+    assert c.max_tokens == 48000
+    default = get_client(backend="claude", model="m", api_key="k").max_tokens
+    assert default == mod.LLMClient.DEFAULT_MAX_TOKENS
+
+
+def test_persistent_truncation_escalates_then_reports_clearly(monkeypatch):
+    """Escalation is bounded: it must stop at the cap with an actionable message."""
+    import src.llm_client as mod
+    budgets = []
 
     class FakeMessages:
         def create(self, **kw):
+            budgets.append(kw["max_tokens"])
             m = _Msg([_Block("text", text='{"partial": ')])
             m.stop_reason = "max_tokens"
             return m
@@ -154,9 +159,12 @@ def test_truncated_response_raises_actionable_error(monkeypatch):
     try:
         c._raw_complete("s", "u")
     except ValueError as e:
-        assert "LLM_MAX_TOKENS" in str(e)
+        assert "cut off" in str(e).lower()
     else:
-        raise AssertionError("expected ValueError on truncation")
+        raise AssertionError("expected ValueError on persistent truncation")
+    assert budgets[0] == mod.LLMClient.DEFAULT_MAX_TOKENS
+    assert budgets[-1] == mod.LLMClient.MAX_TOKENS_CAP
+    assert len(budgets) < 8, "escalation must terminate, not loop"
 
 
 def _client_returning(text, monkeypatch):
@@ -201,3 +209,54 @@ def test_unparseable_response_error_shows_the_tail_too(monkeypatch):
         assert "no json" in str(e).lower()
     else:
         raise AssertionError("expected ValueError")
+
+
+def test_truncation_retries_with_a_larger_budget(monkeypatch):
+    """A cut-off reply should be retried automatically, not pushed onto the user."""
+    import src.llm_client as mod
+    attempts = []
+
+    class FakeMessages:
+        def create(self, **kw):
+            attempts.append(kw["max_tokens"])
+            m = _Msg([_Block("text", text='{"ok": true}')])
+            # truncate on the first, smaller budget only
+            m.stop_reason = "max_tokens" if len(attempts) == 1 else "end_turn"
+            return m
+
+    class FakeAnthropic:
+        def __init__(self, api_key=None):
+            self.messages = FakeMessages()
+
+    monkeypatch.setattr(mod, "_require",
+                        lambda module, backend: type("M", (), {"Anthropic": FakeAnthropic}))
+    c = get_client(backend="claude", model="m", api_key="k", max_tokens=16000)
+    assert c.complete_json("s", "u") == {"ok": True}
+    assert attempts == [16000, 32000], f"expected one escalated retry, got {attempts}"
+
+
+def test_truncation_gives_up_at_the_cap(monkeypatch):
+    import src.llm_client as mod
+    attempts = []
+
+    class FakeMessages:
+        def create(self, **kw):
+            attempts.append(kw["max_tokens"])
+            m = _Msg([_Block("text", text='{"partial":')])
+            m.stop_reason = "max_tokens"
+            return m
+
+    class FakeAnthropic:
+        def __init__(self, api_key=None):
+            self.messages = FakeMessages()
+
+    monkeypatch.setattr(mod, "_require",
+                        lambda module, backend: type("M", (), {"Anthropic": FakeAnthropic}))
+    c = get_client(backend="claude", model="m", api_key="k", max_tokens=32000)
+    try:
+        c._raw_complete("s", "u")
+    except ValueError as e:
+        assert "ceiling" in str(e).lower()
+    else:
+        raise AssertionError("expected ValueError once the cap is reached")
+    assert attempts[-1] <= mod.LLMClient.MAX_TOKENS_CAP

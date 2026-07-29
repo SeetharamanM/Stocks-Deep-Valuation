@@ -98,8 +98,10 @@ def _text_of(message):
 class LLMClient:
     # The narrative pass emits eleven HTML sections in one response, and on
     # reasoning models the thinking tokens draw from this same budget. Too
-    # small a ceiling truncates the JSON mid-object.
-    DEFAULT_MAX_TOKENS = 16000
+    # small a ceiling truncates the JSON mid-object, so start generously and
+    # escalate automatically rather than making the user tune it by hand.
+    DEFAULT_MAX_TOKENS = 32000
+    MAX_TOKENS_CAP = 64000
 
     def __init__(self, backend, model, api_key, base_url=None, max_tokens=None):
         self.backend = backend
@@ -117,15 +119,21 @@ class LLMClient:
         if self.backend == "claude":
             anthropic = _require("anthropic", "claude")
             client = anthropic.Anthropic(api_key=self.api_key)
-            msg = client.messages.create(
-                model=self.model, max_tokens=self.max_tokens, system=system,
-                messages=[{"role": "user", "content": user}])
-            if getattr(msg, "stop_reason", None) == "max_tokens":
-                raise ValueError(
-                    f"The model hit the {self.max_tokens}-token output ceiling and its "
-                    "reply was cut off mid-JSON. Raise LLM_MAX_TOKENS in .env and retry."
-                )
-            return _text_of(msg)
+            budget = self.max_tokens
+            while True:
+                msg = client.messages.create(
+                    model=self.model, max_tokens=budget, system=system,
+                    messages=[{"role": "user", "content": user}])
+                if getattr(msg, "stop_reason", None) != "max_tokens":
+                    return _text_of(msg)
+                if budget >= self.MAX_TOKENS_CAP:
+                    raise ValueError(
+                        f"The model hit the {budget}-token output ceiling even after "
+                        "escalation, and its reply was cut off mid-JSON. The request is "
+                        "too large for a single response; reduce the qualitative context "
+                        "or lower the reasoning effort."
+                    )
+                budget = min(budget * 2, self.MAX_TOKENS_CAP)
         OpenAI = _require("openai", "deepseek").OpenAI
         client = OpenAI(api_key=self.api_key, base_url=self.base_url)
         r = client.chat.completions.create(
