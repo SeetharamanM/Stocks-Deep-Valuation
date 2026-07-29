@@ -16,7 +16,7 @@ import json
 
 from src.valuation_pack import build_pack
 from src.metrics import triangulate, scenario_expected_value
-from src.prompts import ASSUMPTIONS_SYSTEM, narrative_system
+from src.prompts import ASSUMPTIONS_SYSTEM, narrative_system, NARRATIVE_BATCHES
 
 # Keep prompts within a sane token budget; the pack is the important part.
 _PDF_BUDGET_PASS1 = 20000
@@ -63,16 +63,25 @@ def run_analysis(fin, md, sector, pdf_context, client, rf, erp):
         + "\n\nQUALITATIVE CONTEXT FROM FILINGS:\n"
         + pdf_context[:_PDF_BUDGET_PASS2]
     )
-    narrative = client.complete_json(narrative_system(), user2)
+
+    sections, verdict = {}, {}
+    for batch in NARRATIVE_BATCHES:
+        is_last = batch is NARRATIVE_BATCHES[-1]
+        reply = client.complete_json(
+            narrative_system(sections=batch, include_verdict=is_last), user2)
+        for key, value in (reply.get("sections") or {}).items():
+            sections[str(key)] = value
+        if is_last:
+            verdict = reply
 
     return {
         "pack": pack,
         "triangulation": triangulation,
         "scenario": scenario,
-        "narrative": narrative.get("sections", {}),
-        "rating": narrative.get("rating"),
-        "fair_value": narrative.get("fair_value"),
-        "target_price": narrative.get("target_price"),
-        "conviction": narrative.get("conviction"),
+        "narrative": sections,
+        "rating": verdict.get("rating"),
+        "fair_value": verdict.get("fair_value"),
+        "target_price": verdict.get("target_price"),
+        "conviction": verdict.get("conviction"),
         "assumptions": assumptions,
     }

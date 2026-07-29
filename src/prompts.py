@@ -72,6 +72,9 @@ instead; never fabricate a substitute.
 Maintain an objective tone and present the case AGAINST your recommendation as
 well as for it. Distinguish figures taken from source from figures computed.
 
+You are writing ONLY these sections in this pass: {sections_wanted}
+Do not write any other section. Keep each section self-contained.
+
 OUTPUT FORMAT -- follow exactly:
 Return a single JSON object and nothing else. No preamble, no commentary, no
 markdown code fences, and no quoted extracts from the source documents. The
@@ -79,11 +82,7 @@ first character of your reply must be '{{' and the last must be '}}'. HTML goes
 inside the JSON string values, never outside them.
 
 {{
-  "sections": {{"1": "<html>", "2": "<html>", ... "11": "<html>"}},
-  "rating": "STRONG BUY|BUY|HOLD|SELL|STRONG SELL",
-  "fair_value": 0,
-  "target_price": 0,
-  "conviction": "High|Medium|Low"
+  "sections": {{{sections_shape}}}{verdict_shape}
 }}
 
 Each section value is an HTML fragment (use <p>, <table>, <ul>, <b>) that will be
@@ -94,5 +93,25 @@ heroic, and why, against the supplied ceilings.
 """
 
 
-def narrative_system():
-    return NARRATIVE_SYSTEM.format(methodology=methodology())
+VERDICT_SHAPE = """,
+  "rating": "STRONG BUY|BUY|HOLD|SELL|STRONG SELL",
+  "fair_value": 0,
+  "target_price": 0,
+  "conviction": "High|Medium|Low\""""
+
+# Eleven HTML sections do not fit in one reply on every backend (DeepSeek caps
+# output at 8192 tokens), so the narrative is written in batches. The final
+# batch also returns the verdict fields, since it writes the recommendation.
+NARRATIVE_BATCHES = [(1, 2, 3, 4), (5, 6, 7, 8), (9, 10, 11)]
+
+
+def narrative_system(sections=None, include_verdict=True):
+    sections = list(sections or range(1, 12))
+    wanted = ", ".join(str(s) for s in sections)
+    shape = ", ".join(f'"{s}": "<html>"' for s in sections)
+    return NARRATIVE_SYSTEM.format(
+        methodology=methodology(),
+        sections_wanted=wanted,
+        sections_shape=shape,
+        verdict_shape=VERDICT_SHAPE if include_verdict else "",
+    )
