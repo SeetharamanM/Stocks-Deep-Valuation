@@ -22,7 +22,12 @@ have ALREADY been computed from audited financial statements. Your job in this
 pass is ONLY to propose judgment assumptions. You must not restate, recompute,
 or invent any reported figure.
 
-Respond with JSON only, matching this shape exactly:
+OUTPUT FORMAT -- follow exactly:
+Return a single JSON object and nothing else. No preamble, no commentary, no
+markdown code fences, and no quoted extracts from the source documents. The
+first character of your reply must be '{' and the last must be '}'.
+
+The JSON must match this shape exactly:
 
 {
   "drivers": [            // exactly 5 objects, one per forecast year
@@ -67,7 +72,11 @@ instead; never fabricate a substitute.
 Maintain an objective tone and present the case AGAINST your recommendation as
 well as for it. Distinguish figures taken from source from figures computed.
 
-Respond with JSON only:
+OUTPUT FORMAT -- follow exactly:
+Return a single JSON object and nothing else. No preamble, no commentary, no
+markdown code fences, and no quoted extracts from the source documents. The
+first character of your reply must be '{{' and the last must be '}}'. HTML goes
+inside the JSON string values, never outside them.
 
 {{
   "sections": {{"1": "<html>", "2": "<html>", ... "11": "<html>"}},

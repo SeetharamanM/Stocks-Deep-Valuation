@@ -11,9 +11,49 @@ import json
 import re
 
 # Models wrap JSON in prose or markdown fences often enough that we extract
-# rather than parse the whole response.
-_FENCE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL)
-_BRACES = re.compile(r"\{.*\}", re.DOTALL)
+# rather than parse the whole response. A reply may contain several fences --
+# quoted source material as well as the answer -- so every candidate is tried
+# rather than committing to the first one found.
+_JSON_FENCE = re.compile(r"```json\s*(.*?)```", re.DOTALL | re.IGNORECASE)
+_ANY_FENCE = re.compile(r"```(?:[a-zA-Z0-9_-]*)\s*(.*?)```", re.DOTALL)
+
+
+def _balanced_spans(text):
+    """Yield top-level {...} spans, respecting nesting and quoted braces."""
+    depth = start = 0
+    in_string = escaped = False
+    for i, ch in enumerate(text):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}":
+            if depth:
+                depth -= 1
+                if depth == 0:
+                    yield text[start:i + 1]
+
+
+def _json_candidates(text):
+    """Ordered best guesses at the JSON payload inside a model reply."""
+    seen = set()
+    for group in (_JSON_FENCE.findall(text), _ANY_FENCE.findall(text),
+                  _balanced_spans(text), [text]):
+        for cand in group:
+            cand = cand.strip()
+            if cand and cand not in seen:
+                seen.add(cand)
+                yield cand
 
 
 def _require(module, backend):
@@ -96,16 +136,18 @@ class LLMClient:
 
     def complete_json(self, system, user):
         txt = self._raw_complete(system, user)
-        fenced = _FENCE.search(txt)
-        if fenced:
-            txt = fenced.group(1)
-        try:
-            return json.loads(txt)
-        except json.JSONDecodeError:
-            braces = _BRACES.search(txt)
-            if not braces:
-                raise ValueError(f"No JSON object found in model response: {txt[:200]!r}")
-            return json.loads(braces.group(0))
+        for candidate in _json_candidates(txt):
+            try:
+                parsed = json.loads(candidate)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(parsed, dict):
+                return parsed
+        raise ValueError(
+            "No JSON object found in the model response. The model may have "
+            "answered in prose instead of the requested JSON. Response began: "
+            f"{txt[:300]!r} ... and ended: {txt[-300:]!r}"
+        )
 
 
 def get_client(backend, model, api_key, base_url=None, max_tokens=None):

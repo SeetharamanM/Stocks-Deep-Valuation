@@ -157,3 +157,47 @@ def test_truncated_response_raises_actionable_error(monkeypatch):
         assert "LLM_MAX_TOKENS" in str(e)
     else:
         raise AssertionError("expected ValueError on truncation")
+
+
+def _client_returning(text, monkeypatch):
+    c = get_client(backend="claude", model="m", api_key="k")
+    monkeypatch.setattr(c, "_raw_complete", lambda system, user: text)
+    return c
+
+
+def test_json_found_when_a_non_json_fence_comes_first(monkeypatch):
+    """The model often quotes source material in a fence before the answer."""
+    reply = (
+        "Here is the relevant transcript extract:\n\n"
+        "```\ncoming quarters.\n\u2022\nOrder book remains robust and the company\n"
+        "hopes to post strong product growth in FY2027.\n```\n\n"
+        "Based on that, my assumptions:\n\n"
+        '```json\n{"terminal_growth": 0.05, "model_choice": "DCF"}\n```\n'
+    )
+    c = _client_returning(reply, monkeypatch)
+    assert c.complete_json("s", "u") == {"terminal_growth": 0.05, "model_choice": "DCF"}
+
+
+def test_json_found_when_only_prose_fence_and_bare_json(monkeypatch):
+    reply = (
+        "```\nquoted material, not json\n```\n"
+        'Final answer: {"rating": "HOLD", "fair_value": 620}'
+    )
+    c = _client_returning(reply, monkeypatch)
+    assert c.complete_json("s", "u") == {"rating": "HOLD", "fair_value": 620}
+
+
+def test_nested_braces_survive_extraction(monkeypatch):
+    reply = 'Result:\n{"a": {"b": [1, 2]}, "c": "text with } brace"}\nDone.'
+    c = _client_returning(reply, monkeypatch)
+    assert c.complete_json("s", "u") == {"a": {"b": [1, 2]}, "c": "text with } brace"}
+
+
+def test_unparseable_response_error_shows_the_tail_too(monkeypatch):
+    c = _client_returning("no json at all here, just prose " * 20, monkeypatch)
+    try:
+        c.complete_json("s", "u")
+    except ValueError as e:
+        assert "no json" in str(e).lower()
+    else:
+        raise AssertionError("expected ValueError")
