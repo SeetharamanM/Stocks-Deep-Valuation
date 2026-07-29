@@ -1,0 +1,504 @@
+Objective
+
+Conduct a focused valuation of the stock and arrive at a defensible fair value estimate,
+target price and investment recommendation. This is NOT a full company analysis — it is a
+deep-dive on valuation alone. Assume the reader already knows the business; spend the
+entire report on what the company is worth, what the market is currently pricing in, and
+whether the gap between the two is actionable.
+
+Source & Outline of Analysis
+
+Take financial statements and data points from Screener.in. Cross-reference Screener.in,
+Yahoo Finance and TradingView for the most recent price close, market capitalisation and
+peer multiples. Adhere STRICTLY to the sample output outline below. Charts and
+visualisations are encouraged, particularly the valuation band chart and the sensitivity
+grid.
+
+Instructions
+
+Take input from User — Valuation & Recommendation Report
+
+By SEETHARAMAN
+
+1. Valuation Snapshot
+
+-   Company name, sector, current market price, market capitalisation, 52-week range.
+
+-   Recommendation box (quick reference, derived from Section 9 below):
+
+    -   Recommendation: STRONG BUY / BUY / HOLD / SELL / STRONG SELL
+
+    -   Fair Value: Rs x
+
+    -   Target Price: Rs x (y% upside/downside)
+
+    -   Accumulation Zone: Rs a - Rs b
+
+    -   Investment Horizon: [n] months
+
+    -   Conviction: High / Medium / Low, with a one-line reason
+
+-   A single-paragraph verdict stating the core valuation argument in plain language.
+
+2. Valuation Base — the inputs everything else rests on
+
+Before any multiple or model, establish and disclose the base figures. State clearly
+whether each is standalone or consolidated, and which fiscal period it is drawn from.
+
+-   Earnings base: reported PAT and EPS (latest FY and TTM)
+
+-   Normalised earnings: strip out exceptional items, one-off other income, and any
+    non-recurring tax benefit. Show the adjustment as a line-item bridge from reported
+    to normalised EPS. If exceptional items have appeared in four of the last five years,
+    treat them as recurring and say so.
+
+-   Book value per share, and tangible book value per share
+
+-   Net debt or net cash per share (Total debt - Cash & equivalents & investments)
+
+-   Diluted share count, including outstanding ESOPs; note any buyback in progress
+
+-   Effective tax rate versus statutory (~25.17%), and whether any SEZ or concessional
+    benefit is scheduled to expire
+
+-   Free cash flow: CFO - Capex, for each of the last five years, and FCF/PAT conversion
+
+3. Relative Valuation — where the stock trades today
+
+Present a table of current multiples alongside the company's own 5-year and 10-year
+median, and alongside the peer set:
+
+-   P/E (trailing and forward where consensus is available)
+
+-   P/B, and P/Tangible Book
+
+-   EV/EBITDA and EV/EBIT (report both — EBITDA alone hides capital intensity)
+
+-   EV/Sales and P/Sales
+
+-   PEG (P/E divided by expected earnings growth)
+
+-   Dividend yield, and total shareholder yield including buybacks
+
+-   Free cash flow yield (FCF / Market cap)
+
+For the peer comparison, name three to five genuine comparables from the same sector and
+of broadly comparable size. Do not compare across business models. For each peer show at
+minimum P/E, ROCE (or ROE for financials) and Debt/Equity, plus the peer median.
+
+Then answer explicitly: is the current premium or discount to peers and to own history
+justified by a difference in growth, returns on capital, or risk? Quantify where possible.
+
+4. Historical Valuation Bands
+
+-   Compute the 5-year and 10-year median P/E (and the sector-appropriate primary multiple,
+    e.g. P/B for banks, EV/EBITDA for capital-intensive businesses).
+
+-   Show the +1 and -1 standard deviation bands around the median.
+
+-   State where the current multiple sits within that range, in standard deviations.
+
+-   Flag whether the historical band is still a valid anchor — a structural change in
+    growth rate, margin profile, regulation or capital structure invalidates the mean-
+    reversion assumption. Say so plainly if the past band should be discarded.
+
+-   Where a re-rating or de-rating has occurred, identify the year it happened and the
+    cause.
+
+5. Intrinsic Valuation — the primary model
+
+Select the model that fits the business and justify the choice in one sentence.
+
+a) Discounted Cash Flow (default for non-financials)
+
+-   Explicit forecast period: 5 years, with revenue growth, EBIT margin, tax rate,
+    capex and working-capital change stated for each year
+
+-   Cross-check the growth assumption against the arithmetic ceiling:
+    Sustainable Growth Rate = ROE x (1 - Payout Ratio), and
+    Expected g = Reinvestment Rate x ROIC.
+    If the model's assumed growth exceeds both, the model is incoherent — reconcile it or
+    lower the assumption.
+
+-   Cost of equity via CAPM: risk-free rate (10-yr G-Sec), equity risk premium, and beta,
+    with each number sourced and stated
+
+-   WACC, with the debt/equity weights and post-tax cost of debt shown
+
+-   Terminal value: state the method (perpetuity growth or exit multiple), the terminal
+    growth rate (should not exceed long-run nominal GDP, ~5-6% for India), and what
+    percentage of total value sits in the terminal value. If terminal value exceeds 70%
+    of enterprise value, flag it — the valuation is an assumption about the far future,
+    not an analysis of the near one.
+
+-   Bridge from enterprise value to equity value to per-share fair value
+
+-   A 5x5 sensitivity grid: WACC on one axis, terminal growth on the other
+
+b) Excess Return / Justified Multiple (for banks and NBFCs)
+
+For a bank, discard DCF, ROCE, EV/EBITDA and capex-based measures entirely. Use:
+
+    Justified P/B = (ROE - g) / (COE - g)
+
+Supported by: sustainable ROE, ROA, NIM, CASA ratio, credit cost, slippage ratio, PCR,
+CRAR, cost-to-income. Also compute the Internal Capital Generation Rate = ROE x (1 - payout);
+if advances are growing faster than this, equity dilution is coming and must be priced in.
+
+c) Sum-of-the-Parts (for conglomerates and multi-segment businesses)
+
+Value each segment on its own appropriate multiple, state the multiple and the basis,
+apply a holding-company discount where relevant, and disclose it.
+
+d) Dividend Discount Model (for mature, high-payout, low-growth businesses)
+
+Use where payout exceeds 60% and growth is stable.
+
+Note for asset managers: value on P/E and P/AUM, and decompose revenue growth into
+AUM growth plus yield change — AUM can compound while revenue does not.
+
+6. Reverse DCF — what the market is already paying for
+
+Take the current market price as given and solve for the growth rate the market is
+implicitly assuming, holding margins, WACC and terminal growth at reasonable levels.
+
+Report a single number: the implied growth rate priced in.
+
+Then compare it against your own estimate from Section 5, and against the arithmetic
+ceiling from SGR and Reinvestment x ROIC.
+
+This is the most important paragraph in the report. State whether the market's implied
+expectation is achievable, conservative or heroic, and why.
+
+7. Fair Value Triangulation
+
+Blend the methods into a single fair value estimate in a table:
+
+    Method | Fair value per share | Weight | Weighted contribution | Rationale for weight
+
+Weight according to how well each method suits the business. Justify each weight in one
+line. Show the resulting blended fair value, and the range (lowest to highest method
+output) as the honest uncertainty band.
+
+8. Scenario Analysis
+
+Three scenarios, each with stated assumptions and an assigned probability:
+
+    Scenario | Key assumptions | Fair value | Upside/Downside | Probability
+
+-   Bear: what has to go wrong, and what the stock is worth if it does
+
+-   Base: the central case
+
+-   Bull: what has to go right
+
+Compute the probability-weighted expected value and compare it to the current price.
+An asymmetric payoff (limited downside, meaningful upside) matters more than a high base-
+case target.
+
+9. Recommendation
+
+-   Rating: STRONG BUY / BUY / HOLD / SELL / STRONG SELL
+
+-   Target price, and the multiple or method it is derived from
+
+-   Time horizon to target, with reasoning for that horizon
+
+-   Accumulation zone: the price range at which the risk-reward is attractive
+
+-   Review trigger: the specific price or event at which the thesis should be re-examined
+
+-   Position-sizing note: whether this warrants a full, half or starter position given the
+    conviction level and the valuation uncertainty band
+
+Rationale: five to seven numbered points, each anchored to a figure computed earlier in
+this report. No qualitative assertion without a number behind it.
+
+10. Risks to the Valuation
+
+-   The three assumptions the fair value is most sensitive to, ranked, with the fair value
+    impact of each being wrong by a stated margin
+
+-   Sector-specific and regulatory risks that would compress the multiple
+
+-   What specifically would invalidate the thesis — name the observable event, not a vague
+    concern
+
+11. Conclusion
+
+Restate the valuation argument, the fair value, the recommendation and the horizon in
+under 200 words. No new information.
+
+Output Type
+
+Produce a single standalone interactive HTML file that can be opened directly in any
+browser without a build step. Do not produce a markdown report. Do not produce a React JSX
+file. The final deliverable must be a .html file saved to outputs. Design as a professional
+interactive report with the following features:
+
+Professional Design Elements:
+
+-   Clean, corporate colour scheme with professional typography
+
+-   Branded header with company name, current price and report title
+
+-   Prominent recommendation box at the top carrying the rating, fair value, target price
+    and horizon
+
+-   Colour-coded valuation signals: undervalued in green, fairly valued in orange,
+    overvalued in red
+
+-   Proper spacing and margins for readability
+
+-   Each of the eleven sections should be a separate tab in the UI, not one long scroll
+
+Required Visualisations:
+
+-   Valuation band chart: multiple over the last 5-10 years with median and +/-1 SD lines,
+    and the current level marked
+
+-   Peer comparison bar chart on the primary multiple
+
+-   DCF sensitivity heat map (WACC vs terminal growth), colour-scaled
+
+-   Scenario chart showing bear/base/bull fair values against the current price
+
+-   Fair value triangulation chart showing each method's output as a range, with the
+    blended estimate marked
+
+Well-Structured Content:
+
+-   All eleven sections maintained
+
+-   Data presented in neatly formatted tables
+
+-   Clear hierarchical headings and subheadings
+
+-   Every computed figure shown with its formula available on hover or in a footnote
+
+-   Page breaks at logical points for PDF printing
+
+-   Footer with disclaimer and data-source attribution
+
+Important Notes
+
+-   For Indian markets the financial year runs 1 April to 31 March. FY26 is
+    1 April 2025 to 31 March 2026.
+
+-   Keep the lookback period at the last 5 fiscal years for financial data, and 10 years
+    for valuation bands where available.
+
+-   For all Balance Sheet, Income Statement and Cash Flow data, use the latest available
+    annual period. For price and market metrics, use the latest available close, and state
+    the date of that close.
+
+-   State every assumption explicitly. A valuation whose assumptions are hidden cannot be
+    checked or updated.
+
+-   Where a data point is unavailable, say so and provide a reasoned qualitative
+    assessment — do not silently omit it and do not fabricate a figure.
+
+-   Distinguish clearly between figures taken from source and figures computed by you.
+
+-   Use average shareholders' equity for ROE, not closing equity.
+
+-   Include buybacks in the payout ratio, not dividends alone — this materially affects
+    SGR for Indian IT companies.
+
+-   Do not apply ROCE, EV/EBITDA, capex intensity or cash-conversion-cycle metrics to banks,
+    NBFCs or asset managers. Use the sector-specific set in Section 5(b).
+
+-   Maintain an objective tone. Present the case against the recommendation as well as for it.
+
+-   Use bold for headings and subheadings. Highlight or underline the fair value, target
+    price and final recommendation.
+
+-   No need to mention the report generation date.
+
+-   Close with the standard disclaimer: analytical method only, not investment advice.
+
+Reference Output
+
+Reliance Industries Ltd — Valuation & Recommendation Report
+
+By Rahul Chandra
+
+1. Valuation Snapshot
+
+Current Price: Rs 1,248 | Market Cap: Rs 16,88,704 Cr | 52-week range: Rs 1,115 - Rs 1,609
+
+Recommendation: BUY
+Fair Value: Rs 1,850
+Target Price: Rs 1,850 (48% upside)
+Accumulation Zone: Rs 1,180 - Rs 1,290
+Investment Horizon: 18-24 months
+Conviction: Medium — the SOTP gap is wide, but three of the four segments are valued on
+peer multiples rather than cash flows.
+
+Verdict: The market is pricing RIL close to a standalone O2C business with a modest
+premium, and is not paying for the digital and retail segments at anything near the
+multiples comparable listed peers command. The gap is a segment-valuation gap, not an
+earnings-growth gap.
+
+2. Valuation Base
+
+  Item                          Value
+  ----------------------------- ---------------------
+  Reported EPS (FY24)           Rs 51.1
+  Less: exceptional items       Rs (1.8)
+  Normalised EPS                Rs 49.3
+  Book value per share          Rs 590
+  Net debt per share            Rs 176
+  Diluted share count           676.6 Cr
+  Effective tax rate            24.1% (vs 25.17%)
+  FCF/PAT (3-yr avg)            41% — below the 70% healthy threshold; capex-driven
+
+Commentary: The low FCF conversion is the single most important input. It is explained by
+the new-energy and retail capex cycle rather than by working capital deterioration, which
+is a materially different situation, but it does mean a DCF is highly sensitive to when
+that capex normalises.
+
+3. Relative Valuation
+
+  Multiple        Current   5-yr median   Peer median   Read
+  --------------- --------- ------------- ------------- ------------------
+  P/E             24.4      22.1          20.6          Premium
+  P/B             2.12      1.94          1.85          Modest premium
+  EV/EBITDA       11.8      10.9          7.4           Significant premium
+  EV/EBIT         18.2      16.4          10.1          Significant premium
+  FCF yield       1.9%      2.4%          5.1%          Poor
+
+  Peer            P/E     ROCE      Debt/Equity
+  --------------- ------- --------- -------------
+  RIL             24.41   9.61%     0.44
+  IOCL            18.28   21.14%    0.90
+  BPCL            8.19    32.09%    0.76
+  HPCL            11.42   21.26%    1.58
+  Peer median     20.55   21.45%    0.78
+
+Is the premium justified? Partly. RIL earns roughly half the ROCE of its refining peers,
+which on its own argues for a discount, not a premium. The premium is justified only if the
+consumer businesses are worth materially more than the consolidated numbers suggest — which
+is exactly the proposition the SOTP tests.
+
+4. Historical Valuation Bands
+
+10-year median P/E of 22.1, with +1 SD at 28.4 and -1 SD at 15.8. The current 24.4 sits
+0.4 SD above median — mid-band, neither cheap nor stretched on its own history.
+
+The band remains a valid anchor, but with a caveat: the business mix in FY15 was ~85% O2C
+and is now ~57%, so the older half of the series describes a different company. The 5-year
+band is the more reliable reference.
+
+5. Intrinsic Valuation — Sum-of-the-Parts
+
+  Segment           Basis            Multiple   Value/share
+  ----------------- ---------------- ---------- ------------
+  O2C               FY24 EBITDA      9x         Rs 820
+  Jio Platforms     FY24 EBITDA      20x        Rs 540
+  Reliance Retail   FY24 EBITDA      25x        Rs 420
+  New Energy etc.   Invested capital 1x         Rs 70
+  ----------------- ---------------- ---------- ------------
+  Gross SOTP value                              Rs 1,850
+
+SOTP chosen over DCF because the four segments have materially different growth, margin and
+capital-intensity profiles, and a single blended WACC would misprice all four. The weakness
+of the method is that it inherits whatever error sits in the peer multiples used.
+
+6. Reverse DCF
+
+At Rs 1,248, holding WACC at 11.2% and terminal growth at 5%, the market is implying
+consolidated EBIT growth of approximately 8% per annum over the next decade.
+
+Against the arithmetic ceiling: ROE of 9.25% with a payout near 9% gives an SGR of roughly
+8.4%. Reinvestment rate x ROIC gives a similar figure. The market's implied 8% is therefore
+achievable without external funding and is not a heroic assumption — it is close to the
+company's own self-funding ceiling.
+
+This is the crux: the market is not over-paying for growth. The disagreement is about
+segment mix, not growth rate.
+
+7. Fair Value Triangulation
+
+  Method                  Fair value   Weight   Contribution   Rationale
+  ----------------------- ------------ -------- -------------- --------------------------
+  SOTP                    Rs 1,850     50%      Rs 925         Best fit for segment mix
+  Relative (peer P/E)     Rs 1,050     20%      Rs 210         Penalises low ROCE
+  DCF (consolidated)      Rs 1,620     20%      Rs 324         Blended WACC is a weakness
+  P/B x justified ROE     Rs 1,180     10%      Rs 118         Weak fit, non-financial
+  ----------------------- ------------ -------- -------------- --------------------------
+  Blended fair value                            Rs 1,577
+
+Range across methods: Rs 1,050 to Rs 1,850 — a wide band, and honest disclosure of it
+matters more than the point estimate.
+
+8. Scenario Analysis
+
+  Scenario   Key assumptions                              Fair value   Move    Prob.
+  ---------- -------------------------------------------- ------------ ------- -------
+  Bear       Retail multiple compresses to 15x, new
+             energy capex written down                    Rs 1,020     -18%    25%
+  Base       Segments hold current multiples, capex
+             cycle peaks FY26                             Rs 1,577     +26%    55%
+  Bull       Jio or Retail IPO crystallises value at
+             or above assumed multiples                   Rs 1,980     +59%    20%
+
+Probability-weighted expected value: Rs 1,514, or +21% against the current price. The
+payoff is favourably asymmetric.
+
+9. Recommendation
+
+Rating: BUY
+Target Price: Rs 1,850 (SOTP-derived)
+Horizon: 18-24 months — the timeframe over which a value-unlocking event or the capex
+peak would become visible
+Accumulation Zone: Rs 1,180 - Rs 1,290
+Review Trigger: a close above Rs 1,700, or any quarter in which retail EBITDA margin
+contracts sequentially for a second consecutive period
+Position Sizing: half position, added to on confirmation — the Rs 1,050 to Rs 1,850
+valuation band is too wide to justify full sizing on the point estimate
+
+Rationale:
+
+1.  Probability-weighted expected value of Rs 1,514 versus a price of Rs 1,248 — a 21%
+    expected return with a 25%-probability downside of only 18%.
+
+2.  Reverse DCF implies 8% growth, which is within the company's own SGR of 8.4% — the
+    market is not paying up for growth that has to be delivered.
+
+3.  The SOTP gap of 48% is concentrated in two segments with listed comparables, making
+    the assumption testable rather than speculative.
+
+4.  Net debt per share of Rs 176 against Rs 590 of book value leaves balance-sheet capacity
+    intact through the capex cycle.
+
+5.  Against all of this: FCF/PAT of 41% is genuinely poor, ROCE of 9.61% is less than half
+    the peer median, and both must improve for the thesis to work. This is the strongest
+    argument for a HOLD rather than a BUY.
+
+10. Risks to the Valuation
+
+-   Retail EBITDA multiple: each 5x of compression removes roughly Rs 84 per share. This is
+    the single largest sensitivity and rests entirely on peer multiples holding.
+
+-   Capex normalisation timing: a two-year delay in the capex peak cuts the DCF-derived
+    value by approximately 12%.
+
+-   O2C margin cycle: a return to trough refining spreads would remove around Rs 180 per
+    share from the O2C leg.
+
+-   Thesis invalidation: an explicit deferral of the Jio or Retail listing beyond FY28, or
+    two consecutive quarters of retail margin contraction.
+
+11. Conclusion
+
+RIL trades at Rs 1,248 against a blended fair value of Rs 1,577 and an SOTP value of
+Rs 1,850. The reverse DCF shows the market implying 8% growth — within the company's
+self-funding capacity, and therefore not a demanding assumption. The disagreement between
+price and value is about how the consumer segments are capitalised, not about earnings
+delivery. The counter-case is real: returns on capital are half those of refining peers
+and cash conversion is weak, and both need to improve. On a probability-weighted expected
+value of Rs 1,514 and an asymmetric payoff, a BUY rating with a Rs 1,850 target over
+18-24 months is warranted, taken as a half position with additions on confirmation.
+
+Analytical method only. Not investment advice.
