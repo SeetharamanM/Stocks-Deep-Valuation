@@ -1,6 +1,9 @@
 from src import metrics
 from src.metrics_dcf import (capm_cost_of_equity, wacc as calc_wacc,
-                             dcf_valuation, sensitivity_grid, implied_growth_detail)
+                             dcf_valuation, sensitivity_grid, implied_growth_detail,
+                             dcf_from_drivers, sensitivity_grid_drivers,
+                             implied_growth_from_drivers_detail)
+from config import Config
 
 
 def _normalised_base_fcff(fin, base, ret):
@@ -54,32 +57,127 @@ def _normalised_base_fcff(fin, base, ret):
     }
 
 
-def _growth_path(ret, dcf_overrides):
-    """Default DCF growth assumption, capped at the SGR/ROIC ceiling.
-
-    Per the methodology, assumed growth must not exceed EITHER the
-    sustainable growth rate (SGR = ROE x retention) OR the
-    reinvestment-implied growth (Reinvestment x ROIC). Absent an explicit
-    override, the ceiling itself is used as the assumed growth (there is no
-    other independent growth estimate in this dataset); `growth_capped`
-    records whether an override (or the ceiling logic) actually bound.
+def _linear_fade(start, end, years):
+    """Linear path from `start` (year 1) to `end` (year `years`), inclusive
+    of both endpoints. Used to fade a driver assumption toward a long-run
+    steady state over the explicit forecast, rather than holding it flat
+    (which is what let a one-off build-out year get projected forever).
     """
-    overrides = dcf_overrides or {}
+    if years <= 1:
+        return [end]
+    return [start + (end - start) * i / (years - 1) for i in range(years)]
+
+
+def default_drivers(fin, ret, base, years=5, terminal_growth=0.05):
+    """Build a defensible, fully-disclosed default 5-year driver path from
+    actuals, per SAFARI_Valuation.txt sec. 5a. This is what the LLM later
+    overrides with judgment; every assumption here is a disclosed default,
+    not a reported figure.
+
+    - revenue_growth: recent (3yr) sales CAGR, capped at the methodology
+      ceiling min(SGR, Reinvestment x ROIC), then faded linearly to
+      `terminal_growth` by year 5.
+    - ebit_margin: held flat at the latest actual EBIT margin.
+    - tax_rate: faded from the current effective rate to the statutory rate
+      (Config.STATUTORY_TAX) by year 5 -- a concessional effective rate is
+      not assumed to persist in perpetuity.
+    - capex_pct_sales: faded from the latest actual capex/sales ratio down
+      to the latest depreciation/sales ratio (steady-state floor) by year 5.
+      This is the key fix: a single build-out year is no longer projected
+      flat forever.
+    - wc_change_pct: the Screener Data Sheet as parsed here does not expose
+      receivables/inventory movement separately, so this is NOT derived from
+      actuals; it defaults to 0.10 of incremental revenue (a conservative,
+      disclosed placeholder) for every year.
+    - dep_pct_sales: held flat at the latest actual depreciation/sales ratio.
+    """
+    latest = fin.pnl_years[-1]
+    sales_latest = latest.sales
+
+    _, ebit_latest = metrics._ebitda_ebit(fin, latest)
+    ebit_margin = ebit_latest / sales_latest if sales_latest else 0.0
+
+    sales_by_year = {p.year: p.sales for p in fin.pnl_years}
+    years_sorted = sorted(sales_by_year)
+    cagr_3yr = None
+    if len(years_sorted) >= 4:
+        y_now, y_then = years_sorted[-1], years_sorted[-4]
+        s_now, s_then = sales_by_year[y_now], sales_by_year[y_then]
+        if s_then and s_then > 0 and s_now > 0:
+            cagr_3yr = (s_now / s_then) ** (1/3) - 1
+
     sgr = ret.get("sgr")
     g_reinvest = ret.get("g_from_reinvestment")
     candidates = [x for x in (sgr, g_reinvest) if x is not None]
     ceiling = min(candidates) if candidates else 0.0
+    cagr_for_cap = cagr_3yr if cagr_3yr is not None else ceiling
+    growth_capped = cagr_for_cap > ceiling
+    start_growth = min(cagr_for_cap, ceiling)
+    growth_path = _linear_fade(start_growth, terminal_growth, years)
 
-    years = int(overrides.get("years", 5))
-    requested = overrides.get("growth", ceiling)
-    capped = requested > ceiling
-    assumed = min(requested, ceiling)
+    eff_tax_now = base["effective_tax_rate"] if base["effective_tax_rate"] is not None else Config.STATUTORY_TAX
+    tax_path = _linear_fade(eff_tax_now, Config.STATUTORY_TAX, years)
+
+    fcf_series = base["fcf_series"]
+    capex_actual_pct_sales = (fcf_series[-1]["capex"] / sales_latest) if (fcf_series and sales_latest) else 0.0
+    dep_pct_sales = (latest.depreciation / sales_latest) if sales_latest else 0.0
+    raw_capex_path = _linear_fade(capex_actual_pct_sales, dep_pct_sales, years)
+    capex_path = [max(v, dep_pct_sales) for v in raw_capex_path]
+    capex_floor_bound = raw_capex_path != capex_path
+
+    wc_change_pct = 0.10
+    wc_source = (
+        "Screener Data Sheet as parsed here does not expose receivables/inventory "
+        "movement separately, so working-capital change cannot be defensibly derived "
+        "from actuals; defaulted to 0.10 of incremental revenue for every year."
+    )
+
+    drivers = []
+    for i in range(years):
+        drivers.append({
+            "revenue_growth": growth_path[i],
+            "ebit_margin": ebit_margin,
+            "tax_rate": tax_path[i],
+            "capex_pct_sales": capex_path[i],
+            "wc_change_pct": wc_change_pct,
+            "dep_pct_sales": dep_pct_sales,
+        })
+
+    method = (
+        f"Default 5-year drivers (disclosed assumptions, not reported figures): "
+        f"revenue_growth fades from {start_growth:.4f} "
+        f"(3yr sales CAGR {cagr_3yr:.4f} capped at ceiling min(SGR={sgr}, "
+        f"g_from_reinvestment={g_reinvest})={ceiling:.4f}"
+        f"{' -- cap bound' if growth_capped else ' -- cap did not bind'}) "
+        f"to terminal_growth {terminal_growth:.4f} by year {years}. "
+        f"ebit_margin held flat at the latest actual {ebit_margin:.4f}. "
+        f"tax_rate fades from the current effective rate {eff_tax_now:.4f} to the "
+        f"statutory rate {Config.STATUTORY_TAX:.4f} by year {years} (a concessional "
+        "effective rate is not assumed to persist in perpetuity). "
+        f"capex_pct_sales fades from the latest actual {capex_actual_pct_sales:.4f} "
+        f"down to the latest depreciation/sales ratio {dep_pct_sales:.4f} as a "
+        "steady-state floor by year "
+        f"{years} (this is the key fix: a single build-out year is not projected "
+        "flat forever)"
+        f"{'; floor bound the fade in at least one year' if capex_floor_bound else ''}. "
+        f"wc_change_pct: {wc_source} "
+        f"dep_pct_sales held flat at the latest actual {dep_pct_sales:.4f}."
+    )
+
     return {
-        "growth_path": [assumed] * years,
+        "drivers": drivers,
+        "method": method,
         "growth_ceiling": ceiling,
-        "growth_requested": requested,
-        "growth_capped": capped,
+        "growth_cagr_3yr": cagr_3yr,
+        "growth_capped": growth_capped,
         "sgr": sgr, "g_from_reinvestment": g_reinvest,
+        "ebit_margin": ebit_margin,
+        "tax_rate_current": eff_tax_now,
+        "tax_rate_statutory": Config.STATUTORY_TAX,
+        "capex_actual_pct_sales": capex_actual_pct_sales,
+        "capex_floor_dep_pct_sales": dep_pct_sales,
+        "wc_change_pct": wc_change_pct,
+        "wc_source": wc_source,
     }
 
 
@@ -99,13 +197,31 @@ def build_pack(fin, md, sector, rf, erp, dcf_overrides=None):
 
     overrides = dcf_overrides or {}
     terminal_growth = overrides.get("terminal_growth", 0.05)
+    terminal_capex_pct = overrides.get("terminal_capex_pct")
 
+    # Informational single-year FCFF snapshot -- retained for disclosure and
+    # for backward-compatible reporting (e.g. FCF/PAT conversion context),
+    # but no longer used to gate DCF viability. A one-year snapshot,
+    # compounded flat forever, is exactly what made a mid-build-out company
+    # like Aurionpro look permanently cash-negative; the driver-based DCF
+    # below fades capex to a steady state instead.
     fcff_info = _normalised_base_fcff(fin, base, ret)
-    growth_info = _growth_path(ret, dcf_overrides)
-    base_fcff = fcff_info["base_fcff"]
+    base_revenue = fin.pnl_years[-1].sales
+
+    override_drivers = overrides.get("drivers")
+    if override_drivers:
+        drivers = override_drivers
+        drivers_source = "llm_override"
+        drivers_default_method = None
+        driver_disclosure = {}
+    else:
+        driver_disclosure = default_drivers(fin, ret, base, years=5, terminal_growth=terminal_growth)
+        drivers = driver_disclosure["drivers"]
+        drivers_source = "default"
+        drivers_default_method = driver_disclosure["method"]
 
     dcf_common = {
-        "base_fcff": base_fcff,
+        "base_fcff": fcff_info["base_fcff"],
         "base_fcff_method": fcff_info["method"],
         "nopat": fcff_info["nopat"],
         "ebit": fcff_info["ebit"],
@@ -114,61 +230,62 @@ def build_pack(fin, md, sector, rf, erp, dcf_overrides=None):
         "capex_3yr_avg": fcff_info["capex_3yr_avg"],
         "capex_years_used": fcff_info["capex_years_used"],
         "delta_wc": fcff_info["delta_wc"],
-        "growth_path": growth_info["growth_path"],
-        "growth_ceiling": growth_info["growth_ceiling"],
-        "growth_capped": growth_info["growth_capped"],
-        "sgr": growth_info["sgr"],
-        "g_from_reinvestment": growth_info["g_from_reinvestment"],
+        "base_revenue": base_revenue,
+        "drivers_source": drivers_source,
+        "drivers_default_method": drivers_default_method,
+        "sgr": ret.get("sgr"),
+        "g_from_reinvestment": ret.get("g_from_reinvestment"),
         "wacc": w, "coe": coe, "beta": beta,
         "cost_of_debt_post_tax": cod_post_tax,
         "terminal_growth": terminal_growth,
+        "terminal_capex_pct": terminal_capex_pct,
         "net_debt": net_debt, "shares": shares,
     }
 
-    if base_fcff is None or base_fcff <= 0:
-        dcf_pack = {
-            "viable": False,
-            "reason": (
-                f"Normalised FCFF is {base_fcff:.2f} Cr (<= 0). Aurionpro-style "
-                "companies in a heavy capex/acquisition build-out phase can have "
-                "genuinely negative normalised free cash flow; a DCF cannot be "
-                "reliably anchored on current cash flows in that case. This is "
-                "NOT clamped to a fabricated positive number -- the DCF is "
-                "skipped and triangulation should lean on earnings-based methods "
-                "(P/E bands, EV/EBITDA, justified P/B) instead."
-                if base_fcff is not None else
-                "Normalised FCFF could not be computed (insufficient data)."
-            ),
-            **dcf_common,
-        }
-    else:
-        try:
-            res = dcf_valuation(base_fcff, growth_info["growth_path"], w,
-                                terminal_growth, net_debt, shares)
-            grid = sensitivity_grid(
-                base_fcff, growth_info["growth_path"],
+    try:
+        res = dcf_from_drivers(base_revenue, drivers, w, terminal_growth,
+                               net_debt, shares, terminal_capex_pct=terminal_capex_pct)
+        fv = res.get("fair_value_per_share")
+        if fv is None or fv <= 0:
+            dcf_pack = {
+                "viable": False,
+                "reason": (
+                    f"Driver-based DCF (5-year explicit forecast with a fading capex "
+                    f"path) still produces a non-positive fair value per share ({fv}). "
+                    "This is not clamped to a fabricated positive number -- the DCF is "
+                    "skipped and triangulation should lean on earnings-based methods "
+                    "(P/E bands, EV/EBITDA, justified P/B) instead."
+                ),
+                **res, **dcf_common,
+            }
+        else:
+            grid = sensitivity_grid_drivers(
+                base_revenue, drivers,
                 waccs=[w - 0.02, w - 0.01, w, w + 0.01, w + 0.02],
                 gs=[max(terminal_growth - 0.02, -0.5), terminal_growth - 0.01,
                     terminal_growth, terminal_growth + 0.01, terminal_growth + 0.02],
-                net_debt=net_debt, shares=shares,
+                net_debt=net_debt, shares=shares, terminal_capex_pct=terminal_capex_pct,
             )
             dcf_pack = {"viable": True, **res, "sensitivity_grid": grid, **dcf_common}
-        except ValueError as e:
-            dcf_pack = {"viable": False, "reason": f"DCF inputs invalid: {e}", **dcf_common}
+    except ValueError as e:
+        dcf_pack = {"viable": False, "reason": f"DCF inputs invalid: {e}", **dcf_common}
 
     if dcf_pack["viable"]:
         price_for_reverse = md.price or fin.current_price
-        detail = implied_growth_detail(
-            price_per_share=price_for_reverse, base_fcff=base_fcff, wacc=w,
-            terminal_growth=terminal_growth, net_debt=net_debt, shares=shares,
-            years=len(growth_info["growth_path"]),
+        detail = implied_growth_from_drivers_detail(
+            price_per_share=price_for_reverse, base_revenue=base_revenue, drivers=drivers,
+            wacc=w, terminal_growth=terminal_growth, net_debt=net_debt, shares=shares,
+            terminal_capex_pct=terminal_capex_pct,
         )
-        reverse_dcf = {"available": True, **detail}
+        reverse_dcf = {
+            "available": True, **detail,
+            "sgr": ret.get("sgr"), "g_from_reinvestment": ret.get("g_from_reinvestment"),
+        }
     else:
         reverse_dcf = {
             "available": False,
             "reason": "DCF is not viable (see dcf.reason); implied growth cannot be "
-                      "solved without a positive base cash flow to anchor the model on.",
+                      "solved without a viable driver-based DCF to anchor the model on.",
         }
 
     price_used = md.price if md.price is not None else fin.current_price
