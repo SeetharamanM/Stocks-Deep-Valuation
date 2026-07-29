@@ -94,7 +94,7 @@ def test_extended_thinking_response_is_parsed(monkeypatch):
                          _Block("text", text='{"rating": "HOLD"}')]))
 
     class FakeAnthropic:
-        def __init__(self, api_key=None):
+        def __init__(self, api_key=None, **kw):
             self.messages = FakeMessages()
 
     monkeypatch.setattr(mod, "_require",
@@ -113,7 +113,7 @@ def test_multiple_text_blocks_are_joined(monkeypatch):
                          _Block("text", text=' "b": 2}')]))
 
     class FakeAnthropic:
-        def __init__(self, api_key=None):
+        def __init__(self, api_key=None, **kw):
             self.messages = FakeMessages()
 
     monkeypatch.setattr(mod, "_require",
@@ -130,7 +130,7 @@ def test_response_with_no_text_block_raises_clearly(monkeypatch):
             return _Stream(_Msg([_Block("thinking", thinking="only thinking")]))
 
     class FakeAnthropic:
-        def __init__(self, api_key=None):
+        def __init__(self, api_key=None, **kw):
             self.messages = FakeMessages()
 
     monkeypatch.setattr(mod, "_require",
@@ -165,7 +165,7 @@ def test_persistent_truncation_escalates_then_reports_clearly(monkeypatch):
             return _Stream(m)
 
     class FakeAnthropic:
-        def __init__(self, api_key=None):
+        def __init__(self, api_key=None, **kw):
             self.messages = FakeMessages()
 
     monkeypatch.setattr(mod, "_require",
@@ -240,7 +240,7 @@ def test_truncation_retries_with_a_larger_budget(monkeypatch):
             return _Stream(m)
 
     class FakeAnthropic:
-        def __init__(self, api_key=None):
+        def __init__(self, api_key=None, **kw):
             self.messages = FakeMessages()
 
     monkeypatch.setattr(mod, "_require",
@@ -262,7 +262,7 @@ def test_truncation_gives_up_at_the_cap(monkeypatch):
             return _Stream(m)
 
     class FakeAnthropic:
-        def __init__(self, api_key=None):
+        def __init__(self, api_key=None, **kw):
             self.messages = FakeMessages()
 
     monkeypatch.setattr(mod, "_require",
@@ -275,3 +275,53 @@ def test_truncation_gives_up_at_the_cap(monkeypatch):
     else:
         raise AssertionError("expected ValueError once the cap is reached")
     assert attempts[-1] <= mod.LLMClient.MAX_TOKENS_CAP
+
+
+def test_openai_backend_also_escalates_on_truncation(monkeypatch):
+    """Escalation must not be Claude-only; DeepSeek truncates too."""
+    import src.llm_client as mod
+    budgets = []
+
+    class FakeCompletions:
+        def create(self, **kw):
+            budgets.append(kw["max_tokens"])
+            truncated = len(budgets) == 1
+            choice = type("C", (), {
+                "finish_reason": "length" if truncated else "stop",
+                "message": type("M", (), {"content": '{"ok": true}'})()})()
+            return type("R", (), {"choices": [choice]})()
+
+    class FakeOpenAI:
+        def __init__(self, **kw):
+            self.chat = type("Chat", (), {"completions": FakeCompletions()})()
+
+    monkeypatch.setattr(mod, "_require",
+                        lambda module, backend: type("M", (), {"OpenAI": FakeOpenAI}))
+    c = get_client(backend="deepseek", model="deepseek-v4-pro", api_key="k",
+                   base_url="https://api.deepseek.com", max_tokens=16000)
+    assert c.complete_json("s", "u") == {"ok": True}
+    assert budgets == [16000, 32000], f"expected escalation, got {budgets}"
+
+
+def test_openai_backend_is_not_throttled_below_configured_budget(monkeypatch):
+    """A stale hard-coded cap must not silently shrink the request."""
+    import src.llm_client as mod
+    seen = {}
+
+    class FakeCompletions:
+        def create(self, **kw):
+            seen["max_tokens"] = kw["max_tokens"]
+            choice = type("C", (), {
+                "finish_reason": "stop",
+                "message": type("M", (), {"content": '{"ok": true}'})()})()
+            return type("R", (), {"choices": [choice]})()
+
+    class FakeOpenAI:
+        def __init__(self, **kw):
+            self.chat = type("Chat", (), {"completions": FakeCompletions()})()
+
+    monkeypatch.setattr(mod, "_require",
+                        lambda module, backend: type("M", (), {"OpenAI": FakeOpenAI}))
+    c = get_client(backend="deepseek", model="m", api_key="k", max_tokens=32000)
+    c._raw_complete("s", "u")
+    assert seen["max_tokens"] == 32000
