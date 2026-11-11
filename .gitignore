@@ -4,3 +4,4 @@ __pycache__/
 outputs/*.html
 .pytest_cache/
 uploads/
+.streamlit/secrets.toml

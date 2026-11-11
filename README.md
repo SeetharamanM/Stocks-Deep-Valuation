@@ -44,6 +44,20 @@ Opens `http://localhost:5000`. Supply:
 
 The report lands in `outputs/<Stock_Name>_Valuation.html`.
 
+## Deploy to Streamlit Community Cloud
+
+`streamlit_app.py` runs the same pipeline as `app.py` behind a Streamlit UI.
+
+1. Run it locally first: `streamlit run streamlit_app.py`
+   (keys come from `.env` or `.streamlit/secrets.toml`).
+2. At share.streamlit.io, choose **Create app**, then pick this repository,
+   the branch, and `streamlit_app.py` as the main file.
+3. Under **Advanced settings**, paste the contents of
+   `.streamlit/secrets.toml.example` with your real key filled in.
+   **Set `APP_PASSWORD`**: anyone who opens a public app spends your API credits.
+4. Deploy. The report shows in the page and has a download button.
+   Uploads and outputs live on the container's disk only until it restarts.
+
 ## How it works
 
 ```
