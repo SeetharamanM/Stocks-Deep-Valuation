@@ -39,14 +39,42 @@ def _save_upload(storage, upload_dir):
     return path
 
 
+BACKENDS = {"claude": "Claude (Anthropic)", "deepseek": "DeepSeek"}
+
+
+def _build_client(form):
+    """LLM client for the backend chosen on the form.
+
+    A key or model typed into the form is used for that run only and is never
+    stored; otherwise the configured (.env / secrets) values apply.
+    """
+    from src.llm_client import get_client
+
+    backend = (form.get("llm_backend") or config.LLM_BACKEND).strip().lower()
+    if backend not in BACKENDS:
+        raise ValueError(f"Unknown LLM backend {backend!r}; choose claude or deepseek.")
+    typed_key = (form.get("api_key") or "").strip()
+    typed_model = (form.get("model") or "").strip()
+    if backend == "deepseek":
+        key = typed_key or config.DEEPSEEK_API_KEY
+        model = typed_model or config.DEEPSEEK_MODEL
+        extra = {"base_url": config.DEEPSEEK_BASE_URL}
+    else:
+        key = typed_key or config.ANTHROPIC_API_KEY
+        model = typed_model or config.ANTHROPIC_MODEL
+        extra = {}
+    if not key:
+        raise ValueError(f"No API key for {BACKENDS[backend]}. Enter one on the form "
+                         f"or set it in .env / Streamlit secrets.")
+    return get_client(backend, model, key, max_tokens=config.LLM_MAX_TOKENS, **extra)
+
+
 def _default_pipeline(form, files, out_dir):
     from src.screener_parser import parse_screener
     from src.web_data import build_market_data
     from src.pdf_extractor import extract_context
     from src.analyst import run_analysis
     from src.report import render_report
-    from src.llm_client import get_client
-
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     os.makedirs(out_dir, exist_ok=True)
 
@@ -68,14 +96,7 @@ def _default_pipeline(form, files, out_dir):
                                form.get("exchange", "NSE"), overrides)
     pdf_context = extract_context(pdf_paths, max_chars=30000)
 
-    backend = form.get("llm_backend") or config.LLM_BACKEND
-    if backend == "deepseek":
-        client = get_client("deepseek", config.DEEPSEEK_MODEL,
-                            config.DEEPSEEK_API_KEY, config.DEEPSEEK_BASE_URL,
-                            max_tokens=config.LLM_MAX_TOKENS)
-    else:
-        client = get_client("claude", config.ANTHROPIC_MODEL, config.ANTHROPIC_API_KEY,
-                            max_tokens=config.LLM_MAX_TOKENS)
+    client = _build_client(form)
 
     rf = _float_or_none(form.get("risk_free_rate")) or config.RISK_FREE_RATE
     erp = _float_or_none(form.get("equity_risk_premium")) or config.EQUITY_RISK_PREMIUM
@@ -93,7 +114,11 @@ def create_app(pipeline=_default_pipeline):
 
     @app.route("/")
     def index():
-        return render_template("index.html", backends=config.available_backends(),
+        return render_template("index.html", backends=BACKENDS,
+                               configured=config.available_backends(),
+                               default_backend=config.LLM_BACKEND,
+                               models={"claude": config.ANTHROPIC_MODEL,
+                                       "deepseek": config.DEEPSEEK_MODEL},
                                config_rf=config.RISK_FREE_RATE)
 
     @app.route("/run", methods=["POST"])

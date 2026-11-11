@@ -18,7 +18,7 @@ try:
 except Exception:  # no secrets file is fine; .env may supply the keys
     pass
 
-from app import OUT_DIR, _default_pipeline  # noqa: E402
+from app import BACKENDS, OUT_DIR, _default_pipeline  # noqa: E402
 from config import config  # noqa: E402
 
 
@@ -46,10 +46,25 @@ if password and st.session_state.get("authed") is not True:
         st.stop()
     st.session_state["authed"] = True
 
-backends = config.available_backends()
-if not backends:
-    st.warning("No LLM API key configured. Add ANTHROPIC_API_KEY or "
-               "DEEPSEEK_API_KEY to the app's secrets.")
+configured = config.available_backends()
+default_models = {"claude": config.ANTHROPIC_MODEL, "deepseek": config.DEEPSEEK_MODEL}
+
+# Outside the form so the key/model hints update as soon as the choice changes.
+st.subheader("Analysis engine")
+choices = list(BACKENDS)
+llm_backend = st.radio(
+    "Which LLM should run the analysis?", choices, horizontal=True,
+    index=choices.index(config.LLM_BACKEND) if config.LLM_BACKEND in choices else 0,
+    format_func=lambda b: f"{BACKENDS[b]} — "
+                          f"{'key configured' if b in configured else 'no key configured'}")
+k1, k2 = st.columns(2)
+api_key = k1.text_input(
+    f"{BACKENDS[llm_backend]} API key"
+    + (" (optional — overrides the configured key)" if llm_backend in configured else " (required)"),
+    type="password", key=f"key_{llm_backend}",
+    help="Used for this run only; never saved.")
+model = k2.text_input("Model (optional)", placeholder=default_models[llm_backend],
+                      key=f"model_{llm_backend}")
 
 with st.form("valuation"):
     c1, c2, c3 = st.columns([2, 1, 1])
@@ -80,7 +95,6 @@ with st.form("valuation"):
         equity_risk_premium = r2.text_input("Equity risk premium",
                                             placeholder=str(config.EQUITY_RISK_PREMIUM))
 
-    llm_backend = st.selectbox("LLM backend", backends or ["claude"])
     submitted = st.form_submit_button("Run valuation", type="primary")
 
 if submitted:
@@ -92,7 +106,7 @@ if submitted:
                 low_52w=low_52w, high_52w=high_52w, beta=beta,
                 risk_free_rate=risk_free_rate,
                 equity_risk_premium=equity_risk_premium,
-                llm_backend=llm_backend)
+                llm_backend=llm_backend, api_key=api_key, model=model)
     files = {"xlsx": _Upload(xlsx)}
     if annual_report:
         files["annual_report"] = _Upload(annual_report)

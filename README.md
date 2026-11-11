@@ -28,6 +28,13 @@ DEEPSEEK_API_KEY=sk-...
 
 `.env` is git-ignored. The app reads the key; nothing else sees it.
 
+## Choosing the LLM
+
+Both the Flask page and the Streamlit page ask which LLM to run — **Claude** or
+**DeepSeek** — on every report. Each option shows whether a key is configured.
+You can paste an API key and a model name on the form; they are used for that run
+only and never saved. Left blank, the `.env` / Streamlit-secrets values apply.
+
 ## Run
 
 ```bash

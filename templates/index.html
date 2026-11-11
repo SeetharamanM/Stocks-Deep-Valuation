@@ -124,11 +124,25 @@ footer{border-top:1px solid var(--rule);padding:18px 0 40px;font-size:12.5px;col
 
   <fieldset>
     <legend>Analysis engine</legend>
-    <label for="llm_backend">Model</label>
-    <select id="llm_backend" name="llm_backend">
-      {% for b in backends %}<option value="{{ b }}">{{ b }}</option>{% endfor %}
-      {% if not backends %}<option value="claude">claude — no key configured</option>{% endif %}
-    </select>
+    <label>Which LLM should run the analysis?</label>
+    <div class="row">
+      {% for value, label in backends.items() %}
+      <label><input type="radio" name="llm_backend" value="{{ value }}"
+        {% if value == default_backend %}checked{% endif %}>
+        {{ label }} — {% if value in configured %}key configured{% else %}enter key below{% endif %}
+        <small>(default model {{ models[value] }})</small></label>
+      {% endfor %}
+    </div>
+    <div class="row">
+      <div>
+        <label for="api_key">API key (optional — overrides the configured key, used for this run only)</label>
+        <input id="api_key" name="api_key" type="password" autocomplete="off">
+      </div>
+      <div>
+        <label for="model">Model (optional — blank uses the default above)</label>
+        <input id="model" name="model" placeholder="e.g. claude-opus-5-5 or deepseek-chat">
+      </div>
+    </div>
     <p class="hint">The model chooses forecast assumptions and writes the commentary.
        All arithmetic is done in Python and recomputed after the model's assumptions are read,
        so no figure in the report originates from the model.</p>
