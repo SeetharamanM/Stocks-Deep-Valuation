@@ -130,4 +130,11 @@ if "report" in st.session_state:
     st.success(f"Report ready: {name}")
     st.download_button("Download report (.html)", html, file_name=name,
                        mime="text/html")
-    st.components.v1.html(html.decode("utf-8"), height=900, scrolling=True)
+    if hasattr(st, "iframe"):
+        # A data: URL gives the report its own opaque origin, so its LLM-written
+        # text cannot reach the Streamlit page the way a raw HTML string could.
+        import base64
+        st.iframe("data:text/html;base64," + base64.b64encode(html).decode("ascii"),
+                  height=900)
+    else:  # Streamlit releases before st.iframe existed
+        st.components.v1.html(html.decode("utf-8"), height=900, scrolling=True)
